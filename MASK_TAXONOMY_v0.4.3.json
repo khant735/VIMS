@@ -1,0 +1,129 @@
+{
+  "version": "0.4.3",
+  "goal": "Maximum useful mask decomposition with parent unions and individually addressable components.",
+  "geometry": {
+    "representation": "pixel-first compound masks",
+    "supports": [
+      "multiple disconnected components",
+      "holes",
+      "thin structures/paths",
+      "stable instance IDs",
+      "parent union masks"
+    ],
+    "provenance": [
+      "semantic model",
+      "specialist model",
+      "landmark-derived",
+      "alpha matte",
+      "texture/edge-derived"
+    ]
+  },
+  "vehicle": {
+    "parts": [
+      "body",
+      "panel",
+      "door",
+      "hood/bonnet",
+      "trunk/boot",
+      "roof",
+      "window",
+      "windshield",
+      "mirror",
+      "headlight",
+      "taillight",
+      "grille",
+      "bumper",
+      "wheel",
+      "tyre",
+      "rim",
+      "wiper",
+      "number plate",
+      "steering wheel",
+      "seat"
+    ]
+  },
+  "footwear": {
+    "parts": [
+      "upper",
+      "sole",
+      "outsole",
+      "heel",
+      "toe box",
+      "tongue",
+      "eyelet",
+      "lace",
+      "lace segment",
+      "bow",
+      "stitching",
+      "logo"
+    ],
+    "instance_policy": "each visible eyelet/lace run may be a separate component under one shoe"
+  },
+  "clothing": {
+    "parts": [
+      "belt body",
+      "buckle",
+      "keeper loop",
+      "belt hole",
+      "button",
+      "zipper",
+      "zipper teeth",
+      "seam",
+      "stitching",
+      "pocket",
+      "collar",
+      "cuff",
+      "hem"
+    ]
+  },
+  "nature": {
+    "tree": [
+      "trunk",
+      "branch",
+      "twig",
+      "leaf",
+      "bark"
+    ],
+    "leaf": [
+      "blade",
+      "edge",
+      "vein",
+      "stem"
+    ],
+    "wood": [
+      "wood region",
+      "grain line",
+      "knot",
+      "crack"
+    ]
+  },
+  "materials": [
+    "wood",
+    "bark",
+    "fabric",
+    "cotton",
+    "wool",
+    "leather",
+    "velvet",
+    "denim",
+    "metal",
+    "plastic",
+    "glass",
+    "rubber",
+    "stone",
+    "ceramic",
+    "paper"
+  ],
+  "fine_detail": [
+    "fabric weave",
+    "fibre",
+    "thread",
+    "stitch",
+    "hair/fur matte",
+    "wood grain",
+    "bark crack",
+    "leaf vein",
+    "shoelace",
+    "whisker candidate"
+  ]
+}

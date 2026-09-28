@@ -1,0 +1,38 @@
+{
+  "manifest_version": 2,
+  "app_version": "0.4.4",
+  "distribution_policy": "Open-source lossless compression only; extracted ONNX must hash-match original.",
+  "archive_formats": [
+    {
+      "id": "7z-lzma2",
+      "decoder": "LZMA SDK / 7z ANSI-C decoder",
+      "license": "public domain/open-source compatible",
+      "preferred_for": "minimum download size"
+    },
+    {
+      "id": "zstd",
+      "decoder": "Zstandard reference C library",
+      "license": "BSD or GPLv2",
+      "preferred_for": "fast extraction"
+    },
+    {
+      "id": "none",
+      "decoder": "none",
+      "license": "n/a",
+      "preferred_for": "upstream files not yet mirrored as compressed artifacts"
+    }
+  ],
+  "model_entry_schema": {
+    "name": "string",
+    "role": "string",
+    "url": "https URL",
+    "compression": "7z-lzma2|zstd|none",
+    "compressed_sha256": "hex",
+    "compressed_bytes": "integer",
+    "installed_filename": "string",
+    "installed_sha256": "hex",
+    "installed_bytes": "integer",
+    "status": "downloadable|conversion-candidate|training-required"
+  },
+  "note": "v0.4.4 downloader remains compatible with existing verified direct ONNX downloads; compressed entries can be introduced without changing the manifest schema."
+}

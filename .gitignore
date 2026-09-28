@@ -1,0 +1,23 @@
+# Built programs and downloaded runtime files belong in GitHub Releases.
+/build/
+/dist/
+/.deps/
+*.exe
+*.dll
+*.pdb
+*.obj
+*.o
+*.a
+*.lib
+
+# Downloaded model weights and locally trained user data.
+models/*.onnx
+models/*.part
+TrainingGuides/
+TrainingSamples/
+LearnedModels/
+Exports/
+Logs/
+model_download_report.txt
+*.pending
+*.marker
