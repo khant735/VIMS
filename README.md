@@ -1,6 +1,6 @@
-# Vulkan Image Mask Studio
+# VIMS 
 
-**Version 0.4.12.12 · Windows x64 · experimental**
+The program/application abbreviation "VIMS" stands for "vulkan, image, mask, studio".
 
 ![Vulkan Image Mask Studio main window](preview.png)
 
