@@ -1,6 +1,11 @@
 # Vulkan Image Mask Studio
 
 **Version 0.4.12.12 · Windows x64 · experimental**
+## Screenshots
+
+![Vulkan Image Mask Studio main window](app-preview.png)
+
+![Mask editor](mask-editor.png)
 
 Vulkan Image Mask Studio is a desktop application for analysing still images and exporting masks of detected subjects, body regions, clothing, and scene elements. It displays the image in a Vulkan preview and runs ONNX segmentation models through ONNX Runtime. CPU analysis works without DirectML; Auto attempts DirectML when a compatible provider and GPU are available.
 
