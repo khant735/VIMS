@@ -13,7 +13,7 @@ This folder is prepared as a **source repository**. The tested executable, match
    For an existing empty GitHub repository, use its real URL instead:
 
    ```powershell
-   git remote add origin https://github.com/YOUR-ACCOUNT/VulkanImageMaskStudio.git
+   git remote add origin https://github.com/khant735/VIMS/VulkanImageMaskStudio.git
    git push -u origin main
    ```
 
