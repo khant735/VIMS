@@ -30,6 +30,24 @@ Use the + / − / Fit image controls or the mouse wheel over the preview to zoom
 
 The right panel scrolls independently of the preview. The application starts maximized. Give the app folder write access so `Exports`, `Logs`, `TrainingGuides`, `TrainingSamples`, and `LearnedModels` can be created.
 
+## Verify the download
+
+Download both release assets into the same folder:
+
+- `VIMS_v0.4.12.12_Windows_x64.zip`
+- `VIMS_v0.4.12.12_Windows_x64.sha256`
+
+Open PowerShell in that folder and run:
+
+```powershell
+Get-FileHash .\VIMS_v0.4.12.12_Windows_x64.zip -Algorithm SHA256
+Get-Content .\VIMS_v0.4.12.12_Windows_x64.sha256
+```
+
+Compare the hash shown by the first command with the hash in the checksum file. They must match; uppercase and lowercase letters are equivalent.
+
+If they do not match, download both assets again before extracting or running the application.
+
 ## Requirements
 
 - Windows 10 or 11 x64, with a Vulkan-capable GPU and current Vulkan graphics driver for the preview.
