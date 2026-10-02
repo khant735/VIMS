@@ -1,25 +1,58 @@
-# Publishing this project on GitHub
+# Publishing VIMS releases
 
-This folder is prepared as a **source repository**. The tested executable, matching runtime DLLs, downloader and notices are in the separate `VIMS_v0.4.12.12_Windows_x64.zip` file supplied alongside this source archive. GitHub automatically creates source archives for releases; those archives do not contain the executable.
+Repository: https://github.com/khant735/VIMS
 
-1. Extract this source archive to a folder, open PowerShell in that folder, and verify `src/App.cpp`, `README.md`, `LICENSE`, `BUILDING.md`, and `.gitignore` are present.
-2. Set your Git author name and email if they are not already configured; run `git init -b main`, `git add .`, and `git commit -m "Release v0.4.12.12 source"`.
-3. Sign in to GitHub CLI with `gh auth login`. To create a **public** repository and push the code, run:
+The repository contains source code and documentation. Runnable Windows builds are published separately as release assets. GitHub’s automatic source archives do not contain the executable.
 
-   ```powershell
-   gh repo create VulkanImageMaskStudio --public --source=. --remote=origin --push
-   ```
+## Prepare the Windows package
 
-   For an existing empty GitHub repository, use its real URL instead:
+1. Build the application using BUILDING.md.
+2. Put the versioned executable, compatible runtime DLLs, model downloader, taxonomy files, and user documentation in one folder.
+3. Include LICENSE, THIRD_PARTY.md, and the license and notice documents supplied with each bundled dependency under notices/.
+4. Ensure README.md links work from the extracted package.
+5. Exclude downloaded model weights, private training samples, logs, and personal files.
+6. Compress the folder as VIMS_v0.4.12.12_Windows_x64.zip.
 
-   ```powershell
-   git remote add origin https://github.com/khant735/VIMS/VulkanImageMaskStudio.git
-   git push -u origin main
-   ```
+Compilation and archive integrity checks do not establish that the application works correctly on Windows. Describe completed testing and remaining limitations accurately in RELEASE_NOTES.md.
 
-   Do not create a second README or license on GitHub when creating an empty repository; both already exist in the source archive.
+## Generate the checksum
 
-4. Check the third-party DLL notices and model terms described in `THIRD_PARTY.md` before making a **public** binary release. In the repository page, select **Releases → Draft a new release**. Create tag `v0.4.12.12`, title `Vulkan Image Mask Studio v0.4.12.12`, paste `RELEASE_NOTES.md`, check **Set as a pre-release**, attach the `VIMS_v0.4.12.12_Windows_x64.zip` file in the binary assets box, then publish.
-5. Confirm the repository shows `src/` and the new release shows the attached ZIP asset. Download that asset once and verify its SHA-256 against `VIMS_v0.4.12.12_Windows_x64.sha256` supplied with this handoff. The automatic “Source code (zip)” entry is not the runnable app.
+Open PowerShell in the folder containing the final ZIP and run:
 
-A GitHub account and authentication are needed to push or publish. This prepared handoff has not been pushed to any account.
+```powershell
+$zip = 'VIMS_v0.4.12.12_Windows_x64.zip'
+$hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLower()
+"$hash  $zip" | Set-Content -LiteralPath 'VIMS_v0.4.12.12_Windows_x64.sha256' -Encoding ascii
+```
+
+Regenerate the checksum whenever the ZIP changes.
+
+## Publish on GitHub
+
+1. Commit the source and documentation changes to the existing khant735/VIMS repository.
+2. Open Releases and create a release, or edit the existing release when correcting its packaging.
+3. For this version, use tag v0.4.12.12 and title Vulkan Image Mask Studio v0.4.12.12.
+4. Paste RELEASE_NOTES.md into the release description.
+5. Select Set as a pre-release while this version remains a preview.
+6. Attach both:
+   - VIMS_v0.4.12.12_Windows_x64.zip
+   - VIMS_v0.4.12.12_Windows_x64.sha256
+7. When replacing an existing package, replace both assets with the matching new pair.
+8. Publish or save the release.
+
+For future versions, update the tag, executable name, asset filenames, documentation, and checksum commands consistently.
+
+## Verify the published release
+
+Download both assets from GitHub into a fresh folder.
+
+Run:
+
+```powershell
+Get-FileHash .\VIMS_v0.4.12.12_Windows_x64.zip -Algorithm SHA256
+Get-Content .\VIMS_v0.4.12.12_Windows_x64.sha256
+```
+
+Confirm that the hashes match. Extract the ZIP and check that the executable, runtime DLLs, downloader, documentation, and component notices are present.
+
+Test launching, model downloading, image analysis, and exports on Windows. Keep any unconfirmed behavior documented in the release notes.
