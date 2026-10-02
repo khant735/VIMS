@@ -39,7 +39,7 @@ The right panel scrolls independently of the preview. The application starts max
 
 ## Build from source
 
-See [BUILDING.md](BUILDING.md). For publication steps, see [PUBLISHING.md](PUBLISHING.md). This release executable was cross-compiled with LLVM-MinGW and linked against the Vulkan loader import library; the instructions reproduce that toolchain, rather than an earlier OpenCV/vcpkg build. No downloaded model weights or local learning samples are required to compile.
+See [BUILDING.md](https://github.com/khant735/VIMS/blob/main/BUILDING.md). For publication steps, see [PUBLISHING.md](https://github.com/khant735/VIMS/blob/main/PUBLISHING.md). This release executable was cross-compiled with LLVM-MinGW and linked against the Vulkan loader import library; the instructions reproduce that toolchain, rather than an earlier OpenCV/vcpkg build. No downloaded model weights or local learning samples are required to compile.
 
 ## Repository and release contents
 
