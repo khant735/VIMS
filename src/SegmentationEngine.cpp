@@ -609,6 +609,9 @@ static size_t addSkinSurfaceAtlas(AnalysisResult& r,const ImageRGBA& im,const Ma
  publish("Visible red-blue vessel-like colour cues",redBlue,.16f);
  publish("Crease fold wrinkle edge cues",crease,.20f);
  publish("Hair follicle or strand-like dark edge cues",hair,.14f);
+ // Preserve the surface atlas as evidence-only. Specialist future classifiers may
+ // subdivide these candidates into scars, moles, bruising, scabs or vessels, but
+ // geometry alone must never assign those medical/biological identities.
  return n;
 }
 // A lightweight deformable frame estimated from the silhouette itself. It gives the
