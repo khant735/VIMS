@@ -631,6 +631,15 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
   band(p+"/Lower body/Left leg/Knee",p+"/Lower body/Left leg",human,.49,.77,.70,.78,.18f);
   band(p+"/Lower body/Left leg/Shin and calf",p+"/Lower body/Left leg",human,.49,.78,.76,.93,.18f);
   band(p+"/Lower body/Left leg/Ankle and foot",p+"/Lower body/Left leg",human,.48,.82,.90,1.0,.17f);
+  // Fine hand atlas. These are intentionally weak priors until a dedicated hand landmark model is available.
+  band(p+"/Upper body/Right arm/Hand/Palm",p+"/Upper body/Right arm/Hand",human,.08,.27,.575,.645,.12f);
+  band(p+"/Upper body/Right arm/Hand/Knuckles",p+"/Upper body/Right arm/Hand",human,.045,.26,.605,.645,.10f);
+  band(p+"/Upper body/Right arm/Hand/Fingers",p+"/Upper body/Right arm/Hand",human,.025,.22,.625,.690,.10f);
+  band(p+"/Upper body/Right arm/Hand/Fingernails",p+"/Upper body/Right arm/Hand/Fingers",human,.020,.18,.665,.700,.07f);
+  band(p+"/Upper body/Left arm/Hand/Palm",p+"/Upper body/Left arm/Hand",human,.73,.92,.575,.645,.12f);
+  band(p+"/Upper body/Left arm/Hand/Knuckles",p+"/Upper body/Left arm/Hand",human,.74,.955,.605,.645,.10f);
+  band(p+"/Upper body/Left arm/Hand/Fingers",p+"/Upper body/Left arm/Hand",human,.78,.975,.625,.690,.10f);
+  band(p+"/Upper body/Left arm/Hand/Fingernails",p+"/Upper body/Left arm/Hand/Fingers",human,.82,.980,.665,.700,.07f);
  }
  auto animal=first(animals); if(maskArea(animal)){
   const std::string a="Animals/Animal 1/Atlas";
