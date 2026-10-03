@@ -466,53 +466,44 @@ static std::wstring winErrorText(DWORD e) {
     DWORD n=FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
         nullptr,e,0,reinterpret_cast<LPWSTR>(&p),0,nullptr);
     std::wstring s=(n&&p)?std::wstring(p,n):L"Unknown Windows loader error";
-    if(p) LocalFree(p); while(!s.empty()&&(s.back()==L'\r'||s.back()==L'
-'))s.pop_back(); return s;
+    if(p) LocalFree(p);
+    while(!s.empty()&&(s.back()==L'\r'||s.back()==L'\n')) s.pop_back();
+    return s;
 }
 
 bool App::runtimeDiagnostics(bool interactive) {
     const int backend=static_cast<int>(SendMessageW(backendCombo_,CB_GETCURSEL,0,0));
     std::wstringstream out; bool ok=true;
-    out << L"Vulkan Image Mask Studio 0.4.12.13 (ZIP/RGBA build) runtime diagnostics\r
-\r
-";
+    out << L"Vulkan Image Mask Studio 0.4.12.13 (ZIP/RGBA build) runtime diagnostics\r\n\r\n";
     auto checkSystem=[&](const wchar_t* name, bool required){
         SetLastError(0); HMODULE h=LoadLibraryExW(name,nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
-        if(h){out<<L"[OK] "<<name<<L" (Windows system runtime)\r
-";FreeLibrary(h);return true;}
-        DWORD e=GetLastError();out<<(required?L"[FAIL] ":L"[WARN] ")<<name<<L" - "<<winErrorText(e)<<L" (error "<<e<<L")\r
-";
+        if(h){out<<L"[OK] "<<name<<L" (Windows system runtime)\r\n";FreeLibrary(h);return true;}
+        DWORD e=GetLastError();out<<(required?L"[FAIL] ":L"[WARN] ")<<name<<L" - "<<winErrorText(e)<<L" (error "<<e<<L")\r\n";
         if(required)ok=false;return false;
     };
     checkSystem(L"VCRUNTIME140.dll",true); checkSystem(L"VCRUNTIME140_1.dll",true); checkSystem(L"MSVCP140.dll",true); checkSystem(L"MSVCP140_1.dll",true); checkSystem(L"d3d12.dll",backend==1);
-    out<<L"\r
-Application runtimes\r
-";
+    out<<L"\r\nApplication runtimes\r\n";
     auto checkLocal=[&](const wchar_t* name, const char* symbol, bool required){
         auto path=exeDir()/name;
-        if(!std::filesystem::exists(path)){out<<(required?L"[FAIL] ":L"[WARN] ")<<name<<L" - file is missing beside the executable.\r
-";if(required)ok=false;return false;}
+        if(!std::filesystem::exists(path)){out<<(required?L"[FAIL] ":L"[WARN] ")<<name<<L" - file is missing beside the executable.\r\n";if(required)ok=false;return false;}
         SetLastError(0); HMODULE h=LoadLibraryExW(path.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-        if(!h){DWORD e=GetLastError();out<<L"[FAIL] "<<name<<L" exists but Windows cannot load it: "<<winErrorText(e)<<L" (error "<<e<<L")\r
-";ok=false;return false;}
+        if(!h){DWORD e=GetLastError();out<<L"[FAIL] "<<name<<L" exists but Windows cannot load it: "<<winErrorText(e)<<L" (error "<<e<<L")\r\n";ok=false;return false;}
         bool symok=!symbol||GetProcAddress(h,symbol)!=nullptr;
         out<<(symok?L"[OK] ":L"[FAIL] ")<<name;
-        if(symbol)out<<(symok?L" - required API export found.":L" - required API export is missing.");out<<L"\r
-";
+        if(symbol)out<<(symok?L" - required API export found.":L" - required API export is missing.");
+        out<<L"\r\n";
         if(!symok)ok=false;FreeLibrary(h);return symok;
     };
     checkLocal(L"vulkan-1.dll",nullptr,true); checkLocal(L"libc++.dll",nullptr,true); checkLocal(L"libunwind.dll",nullptr,true);
-    bool dml=checkLocal(L"DirectML.dll",nullptr,backend==1);
+    checkLocal(L"DirectML.dll",nullptr,backend==1);
     bool ort=checkLocal(L"onnxruntime.dll","OrtGetApiBase",true);
     if(ort){
         auto path=exeDir()/L"onnxruntime.dll"; HMODULE h=LoadLibraryExW(path.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
         bool ep=h&&GetProcAddress(h,"OrtSessionOptionsAppendExecutionProvider_DML");
-        out<<(ep?L"[OK] ":backend==1?L"[FAIL] ":L"[WARN] ")<<L"ONNX Runtime DirectML execution-provider export"<<L"\r
-";
+        out<<(ep?L"[OK] ":backend==1?L"[FAIL] ":L"[WARN] ")<<L"ONNX Runtime DirectML execution-provider export\r\n";
         if(!ep&&backend==1)ok=false;if(h)FreeLibrary(h);
     }
-    out<<L"\r
-"<<(ok?(backend==2?L"Overall status: READY for CPU inference.":backend==1?L"Overall status: READY for DirectML initialization.":L"Overall status: READY for automatic GPU/CPU selection."):L"Overall status: NOT READY. Analysis has been blocked to prevent a runtime crash.");
+    out<<L"\r\n"<<(ok?(backend==2?L"Overall status: READY for CPU inference.":backend==1?L"Overall status: READY for DirectML initialization.":L"Overall status: READY for automatic GPU/CPU selection."):L"Overall status: NOT READY. Analysis has been blocked to prevent a runtime crash.");
     if(interactive) MessageBoxW(hwnd_,out.str().c_str(),L"Runtime diagnostics",MB_OK|(ok?MB_ICONINFORMATION:MB_ICONERROR));
     if(!ok) setStatus(L"Runtime diagnostics failed. Click Runtime diagnostics for details.");
     return ok;
