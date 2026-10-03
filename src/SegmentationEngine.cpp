@@ -1384,9 +1384,14 @@ AnalysisResult SegmentationEngine::analyse(const ImageRGBA&im){
  CrashLog::write(backend_==Backend::CPU?"Inference mode: CPU":backend_==Backend::DirectML?"Inference mode: DirectML required":"Inference mode: Auto");
  // Validate optional pose specialists through the same ORT/device configuration. Decoding is
  // enabled only after their exact tensor contracts are known; geometry remains the fallback.
- const auto wholePoseInfo=inspectPoseModel(p_,wholeBodyPose_,p_->wholeBodyPose);
- const auto handPoseInfo=inspectPoseModel(p_,handPose_,p_->handPose);
- const auto animalPoseInfo=inspectPoseModel(p_,animalPose_,p_->animalPose);
+ // Do not create optional pose sessions in the main analysis path yet. Some RTMPose
+ // exports require a different input contract from the segmentation models, and probing
+ // them here can make an otherwise valid analysis fail. Presence is reported safely;
+ // tensor inspection/decoding is performed only by the dedicated pose path once implemented.
+ PoseModelInfo wholePoseInfo,handPoseInfo,animalPoseInfo;
+ wholePoseInfo.installed=std::filesystem::exists(wholeBodyPose_);wholePoseInfo.diagnostic=wholePoseInfo.installed?"installed; decoder pending":"not installed";
+ handPoseInfo.installed=std::filesystem::exists(handPose_);handPoseInfo.diagnostic=handPoseInfo.installed?"installed; decoder pending":"not installed";
+ animalPoseInfo.installed=std::filesystem::exists(animalPose_);animalPoseInfo.diagnostic=animalPoseInfo.installed?"installed; decoder pending":"not installed";
  CrashLog::write("Whole-body pose: "+wholePoseInfo.diagnostic);
  CrashLog::write("Hand pose: "+handPoseInfo.diagnostic);
  CrashLog::write("Animal pose: "+animalPoseInfo.diagnostic);
