@@ -67,10 +67,10 @@ std::vector<GpuSample> queryGpuAdapters(){
     PDH_HQUERY q{};PDH_HCOUNTER ctr{};if(PdhOpenQueryW(nullptr,0,&q)!=ERROR_SUCCESS)return out;
     if(PdhAddEnglishCounterW(q,L"\\\\GPU Engine(*)\\Utilization Percentage",0,&ctr)!=ERROR_SUCCESS){PdhCloseQuery(q);return out;}
     PdhCollectQueryData(q);Sleep(100);if(PdhCollectQueryData(q)!=ERROR_SUCCESS){PdhCloseQuery(q);return out;}
-    DWORD bytes=0,n=0;if(PdhGetFormattedCounterArrayW(ctr,PDH_FMT_DOUBLE,&bytes,&n,nullptr)!=PDH_STATUS_MORE_DATA||!bytes){PdhCloseQuery(q);return out;}
+    DWORD bytes=0,n=0;if(PdhGetFormattedCounterArrayW(ctr,PDH_FMT_DOUBLE,&bytes,&n,nullptr)==ERROR_SUCCESS||!bytes){PdhCloseQuery(q);return out;}
     std::vector<unsigned char> mem(bytes);auto* items=(PDH_FMT_COUNTERVALUE_ITEM_W*)mem.data();
     if(PdhGetFormattedCounterArrayW(ctr,PDH_FMT_DOUBLE,&bytes,&n,items)==ERROR_SUCCESS)for(auto& g:out){double total=0;bool found=false;auto token=luidToken(g.luid);
-        for(DWORD i=0;i<n;++i)if(items[i].szName&&lowerCopy(items[i].szName).find(token)!=std::wstring::npos&&(items[i].FmtValue.CStatus==PDH_CSTATUS_VALID_DATA||items[i].FmtValue.CStatus==PDH_CSTATUS_NEW_DATA)){total+=std::max(0.0,items[i].FmtValue.doubleValue);found=true;}
+        for(DWORD i=0;i<n;++i)if(items[i].szName&&lowerCopy(items[i].szName).find(token)!=std::wstring::npos){total+=std::max(0.0,items[i].FmtValue.doubleValue);found=true;}
         if(found)g.utilisation=(int)(std::clamp(total,0.0,100.0)+0.5);}
     PdhCloseQuery(q);return out;
 }
