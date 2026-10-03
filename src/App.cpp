@@ -1090,9 +1090,12 @@ void App::downloadFaceModel() {
     setStatus(L"Running model downloader... A PowerShell window shows per-model progress.");
     modelWorker_ = std::jthread([this,script](std::stop_token st) {
         bool ok=false;
-        const auto launchLog = exeDir() / L"model_downloader_launch.log";
+        const auto logsDir = exeDir() / L"Logs";
+        std::error_code logEc;
+        std::filesystem::create_directories(logsDir, logEc);
+        const auto launchLog = logsDir / L"model_downloader_launch.log";
         { std::wofstream lf(launchLog, std::ios::trunc); lf << L"Starting PowerShell downloader. Script: " << script.wstring() << L"\\n"; }
-        std::wstring cmd=L"& { & '" + script.wstring() + L"' *>&1 | Tee-Object -FilePath '" + (exeDir()/L"model_downloader_console.log").wstring() + L"'; exit $LASTEXITCODE }";
+        std::wstring cmd=L"& { & '" + script.wstring() + L"' *>&1 | Tee-Object -FilePath '" + (logsDir/L"model_downloader_console.log").wstring() + L"'; exit $LASTEXITCODE }";
         std::wstring args=L"-NoProfile -ExecutionPolicy Bypass -Command \"" + cmd + L"\"";
         SHELLEXECUTEINFOW sei{sizeof(sei)};
         sei.fMask=SEE_MASK_NOCLOSEPROCESS;
