@@ -85,10 +85,29 @@ jobs:
           Copy-Item models $out -Recurse -Force
           Copy-Item LICENSE,THIRD_PARTY.md $out -Force
           $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'development' }
-          $zip = "VIMS-$version-Windows-x64.zip"
-          Compress-Archive -Path "$out\*" -DestinationPath $zip -CompressionLevel Optimal -Force
+          $baseZip = "VIMS-$version-Windows-x64.zip"
+          Compress-Archive -Path "$out\*" -DestinationPath $baseZip -CompressionLevel Optimal -Force
+          # CRC32 is used as a short, visible build identifier; SHA-256 remains the integrity hash.
+          $crcTable = 0..255 | ForEach-Object {
+            $c = [uint32]$_
+            1..8 | ForEach-Object { if ($c -band 1) { $c = [uint32](0xEDB88320L -bxor ($c -shr 1)) } else { $c = $c -shr 1 } }
+            $c
+          }
+          $crc = [uint32]0xFFFFFFFFL
+          $stream = [IO.File]::OpenRead($baseZip)
+          try {
+            $buffer = New-Object byte[] 1048576
+            while (($count = $stream.Read($buffer,0,$buffer.Length)) -gt 0) {
+              for ($i=0; $i -lt $count; $i++) { $crc = [uint32]($crcTable[($crc -bxor $buffer[$i]) -band 0xFF] -bxor ($crc -shr 8)) }
+            }
+          } finally { $stream.Dispose() }
+          $crc = [uint32]($crc -bxor 0xFFFFFFFFL)
+          $crc32 = $crc.ToString('X8')
+          $zip = "VIMS-$version-Windows-x64-CRC32-$crc32.zip"
+          Move-Item -LiteralPath $baseZip -Destination $zip
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $zip" | Set-Content "$zip.sha256" -Encoding ascii
+          "$crc32  $zip" | Set-Content "$zip.crc32" -Encoding ascii
           "RELEASE_ZIP=$zip" >> $env:GITHUB_ENV
 
       - name: Upload workflow artifact
@@ -98,6 +117,7 @@ jobs:
           path: |
             ${{ env.RELEASE_ZIP }}
             ${{ env.RELEASE_ZIP }}.sha256
+            ${{ env.RELEASE_ZIP }}.crc32
           compression-level: 0
 
       - name: Publish tagged release assets
@@ -107,4 +127,5 @@ jobs:
           files: |
             ${{ env.RELEASE_ZIP }}
             ${{ env.RELEASE_ZIP }}.sha256
+            ${{ env.RELEASE_ZIP }}.crc32
           generate_release_notes: true
