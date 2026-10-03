@@ -588,39 +588,87 @@ static Mask atlasBand(const Mask& subject,double xa,double xb,double ya,double y
 static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& animals,const Mask& vehicles,const Mask& trees){
  size_t n=0;
  auto publish=[&](const std::string& name,const std::string& parent,const Mask& m,float confidence){
-  if(maskArea(m)<32)return;
+  if(maskArea(m)<24)return;
   if(std::any_of(r.masks.begin(),r.masks.end(),[&](const NamedMask& x){return x.name==name;}))return;
   NamedMask nm;nm.name=name;nm.parent=parent;nm.category="Atlas prior";nm.mask=m;
   nm.source="normalised detected-subject atlas prior";nm.confidence=confidence;nm.provenance=MaskProvenance::LandmarkDerived;
   nm.components=componentsOf(m,name);r.masks.push_back(std::move(nm));++n;
  };
  auto first=[&](const Mask& combined){auto v=significantInstances(combined);return v.empty()?Mask{combined.width,combined.height,std::vector<uint8_t>(combined.pixels.size())}:std::move(v.front());};
+ auto band=[&](const std::string& name,const std::string& parent,const Mask&s,double xa,double xb,double ya,double yb,float cf){publish(name,parent,atlasBand(s,xa,xb,ya,yb),cf);};
  auto human=first(people); if(maskArea(human)){
-  publish("People/Human/Person 1/Body/Atlas/Head guide","People/Human/Person 1/Body/Atlas",atlasBand(human,.25,.75,0,.18),.30f);
-  publish("People/Human/Person 1/Body/Atlas/Upper torso guide","People/Human/Person 1/Body/Atlas",atlasBand(human,.20,.80,.18,.48),.28f);
-  publish("People/Human/Person 1/Body/Atlas/Pelvis guide","People/Human/Person 1/Body/Atlas",atlasBand(human,.28,.72,.43,.62),.25f);
-  publish("People/Human/Person 1/Body/Atlas/Left lower-limb guide","People/Human/Person 1/Body/Atlas",atlasBand(human,.48,.86,.56,1),.22f);
-  publish("People/Human/Person 1/Body/Atlas/Right lower-limb guide","People/Human/Person 1/Body/Atlas",atlasBand(human,.14,.52,.56,1),.22f);
+  const std::string p="People/Human/Person 1/Atlas";
+  // Whole-body reference: regions overlap intentionally at joints because this is a prior, not ground truth.
+  band(p+"/Head/Scalp",p+"/Head",human,.31,.69,.00,.075,.22f);
+  band(p+"/Head/Face",p+"/Head",human,.31,.69,.045,.165,.26f);
+  band(p+"/Head/Ears",p+"/Head",human,.25,.75,.065,.145,.16f);
+  band(p+"/Head/Face/Forehead",p+"/Head/Face",human,.36,.64,.055,.090,.18f);
+  band(p+"/Head/Face/Eyebrows",p+"/Head/Face",human,.34,.66,.078,.102,.18f);
+  band(p+"/Head/Face/Eyes and eyelids",p+"/Head/Face",human,.34,.66,.095,.120,.20f);
+  band(p+"/Head/Face/Nasal root and bridge",p+"/Head/Face/Nose",human,.455,.545,.092,.140,.22f);
+  band(p+"/Head/Face/Nose tip and nostrils",p+"/Head/Face/Nose",human,.425,.575,.132,.158,.20f);
+  band(p+"/Head/Face/Cheeks and cheekbones",p+"/Head/Face",human,.34,.66,.112,.155,.15f);
+  band(p+"/Head/Face/Mouth and lips",p+"/Head/Face",human,.405,.595,.150,.174,.20f);
+  band(p+"/Head/Face/Chin and jaw",p+"/Head/Face",human,.35,.65,.165,.195,.17f);
+  band(p+"/Neck",p,human,.42,.58,.155,.225,.24f);
+  band(p+"/Upper body/Shoulders",p+"/Upper body",human,.18,.82,.19,.285,.20f);
+  band(p+"/Upper body/Chest and ribs",p+"/Upper body",human,.30,.70,.22,.39,.21f);
+  band(p+"/Torso/Abdomen",p+"/Torso",human,.32,.68,.36,.49,.20f);
+  band(p+"/Torso/Waist and pelvis",p+"/Torso",human,.29,.71,.47,.59,.20f);
+  band(p+"/Upper body/Right arm/Upper arm",p+"/Upper body/Right arm",human,.10,.34,.235,.42,.17f);
+  band(p+"/Upper body/Right arm/Elbow",p+"/Upper body/Right arm",human,.08,.32,.38,.47,.16f);
+  band(p+"/Upper body/Right arm/Forearm",p+"/Upper body/Right arm",human,.06,.31,.43,.58,.16f);
+  band(p+"/Upper body/Right arm/Wrist and hand",p+"/Upper body/Right arm",human,.03,.31,.55,.69,.15f);
+  band(p+"/Upper body/Left arm/Upper arm",p+"/Upper body/Left arm",human,.66,.90,.235,.42,.17f);
+  band(p+"/Upper body/Left arm/Elbow",p+"/Upper body/Left arm",human,.68,.92,.38,.47,.16f);
+  band(p+"/Upper body/Left arm/Forearm",p+"/Upper body/Left arm",human,.69,.94,.43,.58,.16f);
+  band(p+"/Upper body/Left arm/Wrist and hand",p+"/Upper body/Left arm",human,.69,.97,.55,.69,.15f);
+  band(p+"/Lower body/Right leg/Thigh",p+"/Lower body/Right leg",human,.24,.51,.55,.73,.19f);
+  band(p+"/Lower body/Right leg/Knee",p+"/Lower body/Right leg",human,.23,.51,.70,.78,.18f);
+  band(p+"/Lower body/Right leg/Shin and calf",p+"/Lower body/Right leg",human,.22,.51,.76,.93,.18f);
+  band(p+"/Lower body/Right leg/Ankle and foot",p+"/Lower body/Right leg",human,.18,.52,.90,1.0,.17f);
+  band(p+"/Lower body/Left leg/Thigh",p+"/Lower body/Left leg",human,.49,.76,.55,.73,.19f);
+  band(p+"/Lower body/Left leg/Knee",p+"/Lower body/Left leg",human,.49,.77,.70,.78,.18f);
+  band(p+"/Lower body/Left leg/Shin and calf",p+"/Lower body/Left leg",human,.49,.78,.76,.93,.18f);
+  band(p+"/Lower body/Left leg/Ankle and foot",p+"/Lower body/Left leg",human,.48,.82,.90,1.0,.17f);
  }
  auto animal=first(animals); if(maskArea(animal)){
-  publish("Animals/Animal 1/Atlas/Head guide","Animals/Animal 1/Atlas",atlasBand(animal,0,.36,.08,.55),.18f);
-  publish("Animals/Animal 1/Atlas/Torso guide","Animals/Animal 1/Atlas",atlasBand(animal,.22,.82,.16,.72),.18f);
-  publish("Animals/Animal 1/Atlas/Lower appendage guide","Animals/Animal 1/Atlas",atlasBand(animal,.12,.88,.60,1),.14f);
-  publish("Animals/Animal 1/Atlas/Tail-or-rear guide","Animals/Animal 1/Atlas",atlasBand(animal,.72,1,.12,.78),.12f);
+  const std::string a="Animals/Animal 1/Atlas";
+  band(a+"/Head/Skull and face",a+"/Head",animal,.00,.34,.08,.48,.17f);
+  band(a+"/Head/Ears horns or antlers",a+"/Head",animal,.00,.36,.00,.25,.12f);
+  band(a+"/Head/Eyes",a+"/Head",animal,.06,.29,.14,.29,.13f);
+  band(a+"/Head/Muzzle snout nose mouth",a+"/Head",animal,.00,.30,.27,.52,.14f);
+  band(a+"/Neck",a,animal,.23,.43,.18,.55,.15f);
+  band(a+"/Body/Chest shoulders torso abdomen",a+"/Body",animal,.30,.78,.20,.68,.17f);
+  band(a+"/Body/Back spine",a+"/Body",animal,.30,.82,.13,.37,.13f);
+  band(a+"/Body/Front limbs",a+"/Body",animal,.22,.50,.50,1.0,.14f);
+  band(a+"/Body/Hind limbs",a+"/Body",animal,.58,.88,.50,1.0,.14f);
+  band(a+"/Body/Paws hooves claws",a+"/Body",animal,.15,.90,.82,1.0,.11f);
+  band(a+"/Body/Tail",a+"/Body",animal,.76,1.0,.12,.72,.11f);
+  band(a+"/Body/Wings or fins",a+"/Body",animal,.22,.88,.20,.75,.09f);
  }
  auto vehicle=first(vehicles); if(maskArea(vehicle)){
-  publish("Vehicles/Vehicle 1/Atlas/Upper cabin guide","Vehicles/Vehicle 1/Atlas",atlasBand(vehicle,.18,.82,0,.48),.16f);
-  publish("Vehicles/Vehicle 1/Atlas/Body guide","Vehicles/Vehicle 1/Atlas",atlasBand(vehicle,0,1,.25,.82),.18f);
-  publish("Vehicles/Vehicle 1/Atlas/Running-gear guide","Vehicles/Vehicle 1/Atlas",atlasBand(vehicle,0,1,.68,1),.15f);
+  const std::string v="Vehicles/Vehicle 1/Atlas";
+  band(v+"/Body/Front section",v+"/Body",vehicle,.00,.30,.20,.82,.14f);
+  band(v+"/Body/Centre chassis or fuselage",v+"/Body",vehicle,.25,.75,.20,.82,.16f);
+  band(v+"/Body/Rear section",v+"/Body",vehicle,.70,1.0,.20,.82,.14f);
+  band(v+"/Cabin roof windows",v,vehicle,.18,.82,.00,.48,.16f);
+  band(v+"/Doors panels cargo area",v+"/Body",vehicle,.20,.85,.35,.78,.13f);
+  band(v+"/Running gear wheels tyres tracks",v,vehicle,.00,1.0,.68,1.0,.15f);
+  band(v+"/Lights bumpers grille",v,vehicle,.00,.25,.40,.88,.11f);
+  band(v+"/Mirrors external attachments",v,vehicle,.05,.95,.12,.55,.09f);
  }
  auto tree=first(trees); if(maskArea(tree)){
-  publish("Scenery/Trees/Tree 1/Atlas/Crown guide","Scenery/Trees/Tree 1/Atlas",atlasBand(tree,0,1,0,.68),.16f);
-  publish("Scenery/Trees/Tree 1/Atlas/Trunk guide","Scenery/Trees/Tree 1/Atlas",atlasBand(tree,.30,.70,.48,1),.16f);
-  publish("Scenery/Trees/Tree 1/Atlas/Root-base guide","Scenery/Trees/Tree 1/Atlas",atlasBand(tree,.18,.82,.84,1),.12f);
+  const std::string t="Scenery/Trees/Tree 1/Atlas";
+  band(t+"/Crown/Upper canopy",t+"/Crown",tree,.00,1.0,.00,.36,.16f);
+  band(t+"/Crown/Middle canopy branches leaves needles",t+"/Crown",tree,.00,1.0,.25,.62,.16f);
+  band(t+"/Crown/Lower branches foliage",t+"/Crown",tree,.04,.96,.50,.76,.14f);
+  band(t+"/Trunk/Upper trunk",t+"/Trunk",tree,.36,.64,.42,.72,.16f);
+  band(t+"/Trunk/Main trunk bark",t+"/Trunk",tree,.39,.61,.60,.94,.18f);
+  band(t+"/Root flare and visible roots",t,tree,.25,.75,.88,1.0,.13f);
  }
  return n;
 }
-
 static void addAnatomyCatalog(AnalysisResult& result){
  const std::string p="People/Human/Person 1";
  bool human=false,animal=false;
