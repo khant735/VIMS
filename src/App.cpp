@@ -429,15 +429,16 @@ RefinementSettings App::refinementSettings() const {RefinementSettings r;r.enabl
 void App::updateRefinementLabels(){wchar_t b[80];swprintf(b,80,L"Boundary Precision: %ld",SendMessageW(boundarySlider_,TBM_GETPOS,0,0));SetWindowTextW(boundaryValue_,b);swprintf(b,80,L"Material Continuity: %ld",SendMessageW(materialSlider_,TBM_GETPOS,0,0));SetWindowTextW(materialValue_,b);swprintf(b,80,L"Colour Tolerance: %ld",SendMessageW(colourSlider_,TBM_GETPOS,0,0));SetWindowTextW(colourValue_,b);swprintf(b,80,L"Refinement Radius: %ld px",SendMessageW(radiusSlider_,TBM_GETPOS,0,0));SetWindowTextW(radiusValue_,b);}
 void App::resetRefinementControls(){SendMessageW(refineEnable_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(boundarySlider_,TBM_SETPOS,TRUE,70);SendMessageW(materialSlider_,TBM_SETPOS,TRUE,65);SendMessageW(colourSlider_,TBM_SETPOS,TRUE,55);SendMessageW(radiusSlider_,TBM_SETPOS,TRUE,8);SendMessageW(fillHoles_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(removeIslands_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(protectSkin_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(refinedView_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(rawView_,BM_SETCHECK,BST_UNCHECKED,0);showRaw_=false;updateRefinementLabels();}
 
-void App::setStatus(const std::wstring& s) { SetWindowTextW(status_, s.c_str()); }
+void App::setStatus(const std::wstring& s) { SetWindowTextW(status_, s.c_str()); if(operationLabel_) SetWindowTextW(operationLabel_, s.c_str()); }
 void App::beginOperation(const std::wstring& label,int percent){
     SetWindowTextW(operationLabel_,label.c_str());
+    InvalidateRect(operationLabel_,nullptr,TRUE); UpdateWindow(operationLabel_);
     LONG style=GetWindowLongW(operationProgress_,GWL_STYLE);
     if(percent<0){SetWindowLongW(operationProgress_,GWL_STYLE,style|PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETMARQUEE,TRUE,35);}
     else{SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);SetWindowLongW(operationProgress_,GWL_STYLE,style&~PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);}
 }
-void App::updateOperation(const std::wstring& label,int percent){SetWindowTextW(operationLabel_,label.c_str());if(percent>=0)SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);}
-void App::endOperation(){SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);LONG style=GetWindowLongW(operationProgress_,GWL_STYLE);SetWindowLongW(operationProgress_,GWL_STYLE,style&~PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETPOS,0,0);SetWindowTextW(operationLabel_,L"Ready");}
+void App::updateOperation(const std::wstring& label,int percent){SetWindowTextW(operationLabel_,label.c_str());if(percent>=0)SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);InvalidateRect(operationLabel_,nullptr,TRUE);UpdateWindow(operationLabel_);UpdateWindow(operationProgress_);}
+void App::endOperation(){SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);SendMessageW(operationProgress_,PBM_SETPOS,0,0);InvalidateRect(operationProgress_,nullptr,TRUE);UpdateWindow(operationProgress_);}
 void App::showError(const std::wstring& title, const std::wstring& message) { MessageBoxW(hwnd_, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR); }
 
 void App::openImage() {
@@ -538,6 +539,7 @@ void App::analyse() {
     EnableWindow(analyseBtn_, FALSE);
     setStatus(backend==2?L"Analysing on CPU...":backend==1?L"Analysing with DirectML...":L"Analysing with automatic device selection...");
 
+    beginOperation(L"Analysing image...",-1);
     ImageRGBA input = image_;
     const std::string cpuChoice=sel==1?"Physical cores (SMT off)":sel==2?"SMT 25%":sel==3?"SMT 50%":sel==4?"SMT 75%":sel==5?"SMT 100%":"Auto CPU threads";
     const std::string gpuChoice=backend==1?"DirectML required":backend==2?"CPU only":"Auto";
@@ -949,6 +951,7 @@ void App::exportSelected() {
     ofn.lpstrFile = file; ofn.nMaxFile = MAX_PATH;
     ofn.lpstrDefExt = L"png"; ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
     if (!GetSaveFileNameW(&ofn)) return;
+    beginOperation(L"Exporting selected mask...",-1);
     try {
         const auto p = std::filesystem::path(file);
         const auto& sourceMasks=(showRaw_&&analysis_.rawMasks.size()==analysis_.masks.size())?analysis_.rawMasks:analysis_.masks;
@@ -962,7 +965,8 @@ void App::exportSelected() {
             SendMessageW(cutoutCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED
             ? L"Exported mask, transparent cutout, boundary and individual components."
             : L"Exported mask, boundary and individual components.");
-    } catch (const std::exception& e) { showError(L"Export failed", widen(e.what())); }
+        endOperation();
+    } catch (const std::exception& e) { endOperation(); showError(L"Export failed", widen(e.what())); }
 }
 
 void App::exportAll() {
@@ -997,11 +1001,16 @@ void App::exportAll() {
             }
         }
         const bool cutouts = SendMessageW(cutoutCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+        beginOperation(L"Exporting masks...",0);
+        size_t exportIndex=0;
         for (const auto& e : out) {
+            updateOperation(L"Exporting mask " + std::to_wstring(exportIndex+1) + L" of " + std::to_wstring(out.size()) + L"...", out.empty()?0:int((exportIndex*90)/out.size()));
             const auto name = safeFileName(e.name);
             SegmentationEngine::exportMaskPng(stage / (name + ".png"), e.mask);
             if (cutouts&&!e.projected) saveCutoutPngWic(stage / (name + "_cutout.png"), image_, e.mask);
+            ++exportIndex;
         }
+        updateOperation(L"Compressing export ZIP...",95);
         auto psQuote=[](std::wstring v){size_t p=0;while((p=v.find(L'\'',p))!=std::wstring::npos){v.replace(p,1,L"''");p+=2;}return L"'"+v+L"'";};
         const auto sourcePattern=(stage/L"*").wstring();
         const std::wstring command=L"powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"Compress-Archive -Path " +
@@ -1018,7 +1027,7 @@ void App::exportAll() {
         std::filesystem::remove_all(stage,ignored);
         endOperation();
         setStatus(L"Exported current image to " + zipPath.wstring() + L" using maximum ZIP compression; all mask files are contained inside the archive.");
-    } catch (const std::exception& e) { showError(L"Export failed", widen(e.what())); }
+    } catch (const std::exception& e) { endOperation(); showError(L"Export failed", widen(e.what())); }
 }
 
 void App::exportPoseGifs(){
@@ -1117,6 +1126,7 @@ void App::downloadFaceModel() {
         return;
     }
     downloadingFaceModel_ = true;
+    beginOperation(L"Downloading / verifying AI models...",-1);
     EnableWindow(faceModelBtn_, FALSE);
     setStatus(L"Running model downloader... A PowerShell window shows per-model progress.");
     modelWorker_ = std::jthread([this,script](std::stop_token st) {
@@ -1148,6 +1158,7 @@ void App::downloadFaceModel() {
 }
 
 void App::faceModelDone(bool ok) {
+    endOperation();
     downloadingFaceModel_=false; EnableWindow(faceModelBtn_,TRUE); updateFaceModelStatus();
     if(ok){ setStatus(L"Model download pass completed. Installed models are available to the analysis pipeline."); MessageBoxW(hwnd_,L"The model download pass completed. Check the PowerShell output for any optional models that need retrying.",L"Model pack installed",MB_OK|MB_ICONINFORMATION); }
     else { setStatus(L"Model pack download/verification failed."); showError(L"Model pack",L"The model downloader could not complete its required models. See model_downloader_launch.log, model_downloader_console.log and model_download_report.txt beside the application."); }
