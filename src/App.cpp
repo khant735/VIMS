@@ -86,7 +86,7 @@ int App::run(int showCmd) {
     RegisterClassW(&vc);
 
     WNDCLASSW pc=wc;pc.lpfnWndProc=panelProc;pc.lpszClassName=L"VulkanImageMaskStudioPanel";RegisterClassW(&pc);
-    hwnd_ = CreateWindowExW(0, wc.lpszClassName, L"Vulkan Image Mask Studio 0.4.12.12",
+    hwnd_ = CreateWindowExW(0, wc.lpszClassName, L"Vulkan Image Mask Studio 0.4.12.13 (ZIP/RGBA build)",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT, 1400, 860,
         nullptr, nullptr, instance_, this);
     if (!hwnd_) return 1;
@@ -453,7 +453,7 @@ static std::wstring winErrorText(DWORD e) {
 bool App::runtimeDiagnostics(bool interactive) {
     const int backend=static_cast<int>(SendMessageW(backendCombo_,CB_GETCURSEL,0,0));
     std::wstringstream out; bool ok=true;
-    out << L"Vulkan Image Mask Studio runtime diagnostics\r\n\r\n";
+    out << L"Vulkan Image Mask Studio 0.4.12.13 (ZIP/RGBA build) runtime diagnostics\r\n\r\n";
     auto checkSystem=[&](const wchar_t* name, bool required){
         SetLastError(0); HMODULE h=LoadLibraryExW(name,nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
         if(h){out<<L"[OK] "<<name<<L" (Windows system runtime)\r\n";FreeLibrary(h);return true;}
