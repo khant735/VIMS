@@ -939,11 +939,18 @@ void App::exportSelected() {
 void App::exportAll() {
     if (analysis_.masks.empty()) { showError(L"Export", L"Analyse an image first."); return; }
     try {
-        const std::filesystem::path dir = exeDir() / L"Exports";
-        std::filesystem::create_directories(dir);
-        // Fast bulk export: semantic names are the filenames.
-        // Equivalent duplicate semantic names are merged before writing, so a later
-        // prediction cannot silently overwrite an earlier file with the same name.
+        const std::filesystem::path exportsDir = exeDir() / L"Exports";
+        std::filesystem::create_directories(exportsDir);
+        std::wstring imageStem = loadedImagePath_.empty() ? L"image" : loadedImagePath_.stem().wstring();
+        for (auto& c : imageStem) if (c==L'<'||c==L'>'||c==L':'||c==L'"'||c==L'/'||c==L'\\'||c==L'|'||c==L'?'||c==L'*') c=L'_';
+        if(imageStem.empty()) imageStem=L"image";
+        const auto stage = exportsDir / (L"." + imageStem + L"_export_pending");
+        const auto zipPath = exportsDir / (imageStem + L".zip");
+        const auto pendingZip = exportsDir / (imageStem + L".pending.zip");
+        std::error_code ignored;
+        std::filesystem::remove_all(stage,ignored);
+        std::filesystem::remove(pendingZip,ignored);
+        std::filesystem::create_directories(stage);
         struct ExportEntry { std::string name; Mask mask; bool projected=false; };
         std::vector<ExportEntry> out;
         std::unordered_map<std::string,size_t> byFile;
@@ -960,10 +967,24 @@ void App::exportAll() {
         const bool cutouts = SendMessageW(cutoutCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
         for (const auto& e : out) {
             const auto name = safeFileName(e.name);
-            SegmentationEngine::exportMaskPng(dir / (name + ".png"), e.mask);
-            if (cutouts&&!e.projected) saveCutoutPngWic(dir / (name + "_cutout.png"), image_, e.mask);
+            SegmentationEngine::exportMaskPng(stage / (name + ".png"), e.mask);
+            if (cutouts&&!e.projected) saveCutoutPngWic(stage / (name + "_cutout.png"), image_, e.mask);
         }
-        setStatus(L"Exported visible masks and labelled hidden-surface projection PNGs; cutouts contain visible masks only.");
+        auto psQuote=[](std::wstring v){size_t p=0;while((p=v.find(L'\'',p))!=std::wstring::npos){v.replace(p,1,L"''");p+=2;}return L"'"+v+L"'";};
+        const auto sourcePattern=(stage/L"*").wstring();
+        const std::wstring command=L"powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"Compress-Archive -Path " +
+            psQuote(sourcePattern) + L" -DestinationPath " + psQuote(pendingZip.wstring()) + L" -CompressionLevel Optimal -Force\"";
+        STARTUPINFOW si{sizeof(si)}; PROCESS_INFORMATION pi{};
+        std::vector<wchar_t> cmd(command.begin(),command.end());cmd.push_back(0);
+        if(!CreateProcessW(nullptr,cmd.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&si,&pi))
+            throw std::runtime_error("Could not start Windows PowerShell ZIP compressor");
+        WaitForSingleObject(pi.hProcess,INFINITE);DWORD exitCode=1;GetExitCodeProcess(pi.hProcess,&exitCode);CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
+        if(exitCode!=0||!std::filesystem::exists(pendingZip)) throw std::runtime_error("ZIP compression failed");
+        std::filesystem::remove(zipPath,ignored);
+        if(!MoveFileExW(pendingZip.c_str(),zipPath.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
+            throw std::runtime_error("Could not finish export ZIP");
+        std::filesystem::remove_all(stage,ignored);
+        setStatus(L"Exported current image to " + zipPath.wstring() + L" using maximum ZIP compression; all mask files are contained inside the archive.");
     } catch (const std::exception& e) { showError(L"Export failed", widen(e.what())); }
 }
 
