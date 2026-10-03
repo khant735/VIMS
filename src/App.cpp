@@ -515,10 +515,9 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 }else report<<L"  Vulkan device/render: not tested (renderer currently bound to another adapter)\r\n";
                 report<<L"  DirectML per-adapter compute: pending scheduler implementation\r\n\r\n";
             }
-            report<<L"\\r\\n============================================================\\r\\n";
-            report<<L"PLATFORM COMPATIBILITY PROBES\\r\\n";
-            report<<L"============================================================\\r\\n\\r\\n";
-            report<<L"These are Windows-side theoretical checks. They do not mean the gears were rendered on the real console, mobile device or browser.\\r\\n\\r\\n";
+            report<<L"\\r\\n=PLATFORM COMPATIBILITY PROBES=\\r\\n\\r\\n";
+            report<<L"These are Windows-side theoretical checks.\\r\\n";
+            report<<L"They do not mean the gears were rendered on the real console, mobile device or browser.\\r\\n\\r\\n";
             for(const auto& r:theoreticalCalibrationResults()){
                 const auto& all=calibrationBackends();
                 auto it=std::find_if(all.begin(),all.end(),[&](const CalibrationBackendInfo& b){return b.backend==r.backend;});
@@ -529,9 +528,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     report<<L"  Note: "<<r.detail<<L"\\r\\n";
                 report<<L"\\r\\n";
             }
-            report<<L"============================================================\\r\\n";
-            report<<L"RESULT KEY\\r\\n";
-            report<<L"============================================================\\r\\n\\r\\n";
+            report<<L"=RESULT KEY=\\r\\n\\r\\n";
             report<<L"RENDER PASS              = Frames were actually rendered and presented by that Windows backend.\\r\\n";
             report<<L"THEORETICALLY COMPATIBLE = Scene requirements fit the target profile; real target hardware was not executed.\\r\\n";
             report<<L"TRANSLATION REQUIRED      = A translation layer is required for that target.\\r\\n";
