@@ -944,7 +944,10 @@ void App::exportAll() {
         std::wstring imageStem = loadedImagePath_.empty() ? L"image" : loadedImagePath_.stem().wstring();
         for (auto& c : imageStem) if (c==L'<'||c==L'>'||c==L':'||c==L'"'||c==L'/'||c==L'\\'||c==L'|'||c==L'?'||c==L'*') c=L'_';
         if(imageStem.empty()) imageStem=L"image";
-        const auto stage = exportsDir / (L"." + imageStem + L"_export_pending");
+        wchar_t tempRoot[MAX_PATH]{};
+        const DWORD tempLen=GetTempPathW(MAX_PATH,tempRoot);
+        if(tempLen==0||tempLen>=MAX_PATH) throw std::runtime_error("Could not locate the Windows temporary folder");
+        const auto stage = std::filesystem::path(tempRoot) / (L"VIMS_export_" + std::to_wstring(GetCurrentProcessId()));
         const auto zipPath = exportsDir / (imageStem + L".zip");
         const auto pendingZip = exportsDir / (imageStem + L".pending.zip");
         std::error_code ignored;
