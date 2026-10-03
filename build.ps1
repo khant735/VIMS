@@ -17,7 +17,7 @@ $ortInclude = Split-Path -Parent $ortHeader
 $output = Join-Path $PSScriptRoot $OutputDirectory
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 $exe = Join-Path $output 'VulkanImageMaskStudio.exe'
-$sources = @('main','App','VulkanRenderer','SegmentationEngine','LearningStore','WicImage','CpuTopology','CompoundMask','PoseGif','CrashLog') | ForEach-Object { Join-Path $PSScriptRoot "src/$_.cpp" }
+$sources = @('main','App','VulkanRenderer','RenderCalibration','SegmentationEngine','LearningStore','WicImage','CpuTopology','CompoundMask','PoseGif','CrashLog') | ForEach-Object { Join-Path $PSScriptRoot "src/$_.cpp" }
 $compilerArgs = @('-std=c++20','-O2','-Wno-macro-redefined','-DUNICODE','-D_UNICODE','-DNOMINMAX','-DWIN32_LEAN_AND_MEAN','-DVK_USE_PLATFORM_WIN32_KHR',"-I$vkInclude","-I$ortInclude") + $sources + @($vkLib,'-lcomdlg32','-lshell32','-luser32','-lgdi32','-lole32','-lwindowscodecs','-luuid','-lwinhttp','-lbcrypt','-lpdh','-ldxgi','-ldxguid','-lcomctl32','-municode','-mwindows','-o',$exe)
 & $compiler @compilerArgs
 if ($LASTEXITCODE -ne 0) { throw "Compiler returned exit code $LASTEXITCODE" }
