@@ -18,3 +18,23 @@ struct CalibrationScene {
 CalibrationMesh makeCalibrationGear(int teeth,float rootRadius,float tipRadius,float holeRadius,float thickness);
 CalibrationScene makeCalibrationScene();
 void animateCalibrationScene(CalibrationScene& scene,float seconds);
+
+enum class CalibrationBackend {
+    CpuSoftware,
+    Vulkan,
+    Direct3D12,
+    Direct3D11,
+    Direct3D9,
+    OpenGL,
+    OpenGLES,
+    WebGPU,
+    WebGL2,
+    WebGL1
+};
+struct CalibrationBackendInfo {
+    CalibrationBackend backend;
+    const wchar_t* name;
+    bool nativeWindows;
+    bool browserOrMobile;
+};
+const std::vector<CalibrationBackendInfo>& calibrationBackends();
