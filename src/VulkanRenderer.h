@@ -15,7 +15,7 @@ public:
     void draw();
     void resized();
     bool ready() const { return device_ != VK_NULL_HANDLE; }
-    const char* gpuName() const { return gpuName_; }
+    const char* gpuName() const { return gpuName_; }\n    bool gpuLuid(LUID& luid) const;
 
 private:
     HWND hwnd_ = nullptr;
