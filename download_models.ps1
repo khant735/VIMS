@@ -2,8 +2,10 @@ param([switch]$CoreOnly,[switch]$SpecialistsOnly,[switch]$IncludeExperimental)
 $ErrorActionPreference="Stop"
 $ProgressPreference="SilentlyContinue"
 $modelsDir=Join-Path $PSScriptRoot "models"
-$report=Join-Path $PSScriptRoot "model_download_report.txt"
+$logsDir=Join-Path $PSScriptRoot "Logs"
+$report=Join-Path $logsDir "model_download_report.txt"
 New-Item -ItemType Directory -Force -Path $modelsDir | Out-Null
+New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
 "Vulkan Image Mask Studio model download report - $(Get-Date -Format o)" | Set-Content $report
 
 function Model($Name,$File,$Url,[long]$Min,$Group,$Sha="") {
