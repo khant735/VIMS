@@ -431,7 +431,7 @@ void App::openImage() {
     ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
     if (!GetOpenFileNameW(&ofn)) return;
 
-    try { image_ = loadImageWic(std::filesystem::path(file)); } catch (const std::exception& e) { showError(L"Open image", widen(e.what())); return; }
+    try { image_ = loadImageWic(std::filesystem::path(file)); loadedImagePath_ = std::filesystem::path(file); } catch (const std::exception& e) { showError(L"Open image", widen(e.what())); return; }
     analysis_ = {};
     guides_.clear();guideAngles_.clear();guideEdited_.clear();guideMode_=false;SendMessageW(guideBtn_,BM_SETCHECK,BST_UNCHECKED,0);
     TreeView_DeleteAllItems(maskList_);
