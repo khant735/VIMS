@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <fstream>
+#include <functional>
 #include <queue>
 #include <set>
 #include <sstream>
@@ -669,7 +670,8 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
   nm.components=componentsOf(m,name);r.masks.push_back(std::move(nm));++n;
  };
  auto first=[&](const Mask& combined){auto v=significantInstances(combined);return v.empty()?Mask{combined.width,combined.height,std::vector<uint8_t>(combined.pixels.size())}:std::move(v.front());};
- auto band=[&](const std::string& name,const std::string& parent,const Mask&s,double xa,double xb,double ya,double yb,float cf){publish(name,parent,atlasBand(s,xa,xb,ya,yb),cf);};
+ std::function<void(const std::string&,const std::string&,const Mask&,double,double,double,double,float)> band=
+  [&](const std::string& name,const std::string& parent,const Mask&s,double xa,double xb,double ya,double yb,float cf){publish(name,parent,atlasBand(s,xa,xb,ya,yb),cf);};
  auto human=first(people); if(maskArea(human)){
   const std::string p="People/Human/Person 1/Atlas";
   const DeformFrame humanFrame=estimateDeformFrame(human);
