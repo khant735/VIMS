@@ -23,7 +23,10 @@
 #include <array>
 #include <chrono>
 #include <windowsx.h>
-#include <cmath>\n#include <pdh.h>
+#include <cmath>
+#include <pdh.h>
+#include <dxgi1_2.h>
+#include <cwctype>
 
 namespace {
 constexpr double pi=3.14159265358979323846;
@@ -52,46 +55,24 @@ std::wstring utf8ToWide(const std::string& s) {
     return w;
 }
 
-// Windows exposes GPU engine utilisation through the GPU Engine performance
-// counter provider. Sum engines for the Vulkan adapter, but cap at 100% so
-// this remains an adapter utilisation figure rather than an engine-count sum.
-int queryGpuUtilisation(const std::wstring& gpuName) {
-    PDH_HQUERY query{};
-    PDH_HCOUNTER counter{};
-    if (PdhOpenQueryW(nullptr, 0, &query) != ERROR_SUCCESS) return -1;
-    const wchar_t* path = L"\\\\GPU Engine(*)\\Utilization Percentage";
-    if (PdhAddEnglishCounterW(query, path, 0, &counter) != ERROR_SUCCESS) {
-        PdhCloseQuery(query);
-        return -1;
-    }
-    if (PdhCollectQueryData(query) != ERROR_SUCCESS) {
-        PdhCloseQuery(query);
-        return -1;
-    }
-    Sleep(100);
-    if (PdhCollectQueryData(query) != ERROR_SUCCESS) {
-        PdhCloseQuery(query);
-        return -1;
-    }
-    DWORD size=0,count=0;
-    PDH_STATUS s=PdhGetFormattedCounterArrayW(counter,PDH_FMT_DOUBLE,&size,&count,nullptr);
-    if(s!=PDH_MORE_DATA || !size){PdhCloseQuery(query);return -1;}
-    std::vector<unsigned char> storage(size);
-    auto* items=reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W*>(storage.data());
-    if(PdhGetFormattedCounterArrayW(counter,PDH_FMT_DOUBLE,&size,&count,items)!=ERROR_SUCCESS){
-        PdhCloseQuery(query);return -1;
-    }
-    double total=0.0;
-    // GPU Engine instance names do not reliably carry the friendly Vulkan
-    // adapter name, so use the system GPU-engine aggregate. On the common
-    // single-adapter case this is the selected Vulkan GPU's activity.
-    for(DWORD i=0;i<count;++i)
-        if(items[i].FmtValue.CStatus==PDH_CSTATUS_VALID_DATA ||
-           items[i].FmtValue.CStatus==PDH_CSTATUS_NEW_DATA)
-            total += std::max(0.0,items[i].FmtValue.doubleValue);
-    PdhCloseQuery(query);
-    (void)gpuName;
-    return static_cast<int>(std::clamp(total,0.0,100.0)+0.5);
+struct GpuSample { std::wstring name; LUID luid{}; SIZE_T dedicatedBytes=0; int utilisation=-1; };
+std::wstring lowerCopy(std::wstring v){std::transform(v.begin(),v.end(),v.begin(),[](wchar_t x){return std::towlower(x);});return v;}
+std::wstring luidToken(const LUID& l){wchar_t b[64]{};swprintf(b,64,L"luid_0x%08x_0x%08x",(unsigned)l.HighPart,(unsigned)l.LowPart);return lowerCopy(b);}
+std::vector<GpuSample> queryGpuAdapters(){
+    std::vector<GpuSample> out; IDXGIFactory1* factory=nullptr;
+    if(FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1),(void**)&factory))) return out;
+    for(UINT i=0;;++i){IDXGIAdapter1* a=nullptr;if(factory->EnumAdapters1(i,&a)==DXGI_ERROR_NOT_FOUND)break;if(!a)continue;
+        DXGI_ADAPTER_DESC1 d{};if(SUCCEEDED(a->GetDesc1(&d))&&!(d.Flags&DXGI_ADAPTER_FLAG_SOFTWARE)){GpuSample g;g.name=d.Description;g.luid=d.AdapterLuid;g.dedicatedBytes=d.DedicatedVideoMemory;out.push_back(g);}a->Release();}
+    factory->Release();
+    PDH_HQUERY q{};PDH_HCOUNTER ctr{};if(PdhOpenQueryW(nullptr,0,&q)!=ERROR_SUCCESS)return out;
+    if(PdhAddEnglishCounterW(q,L"\\\\GPU Engine(*)\\Utilization Percentage",0,&ctr)!=ERROR_SUCCESS){PdhCloseQuery(q);return out;}
+    PdhCollectQueryData(q);Sleep(100);if(PdhCollectQueryData(q)!=ERROR_SUCCESS){PdhCloseQuery(q);return out;}
+    DWORD bytes=0,n=0;if(PdhGetFormattedCounterArrayW(ctr,PDH_FMT_DOUBLE,&bytes,&n,nullptr)!=PDH_MORE_DATA||!bytes){PdhCloseQuery(q);return out;}
+    std::vector<unsigned char> mem(bytes);auto* items=(PDH_FMT_COUNTERVALUE_ITEM_W*)mem.data();
+    if(PdhGetFormattedCounterArrayW(ctr,PDH_FMT_DOUBLE,&bytes,&n,items)==ERROR_SUCCESS)for(auto& g:out){double total=0;bool found=false;auto token=luidToken(g.luid);
+        for(DWORD i=0;i<n;++i)if(items[i].szName&&lowerCopy(items[i].szName).find(token)!=std::wstring::npos&&(items[i].FmtValue.CStatus==PDH_CSTATUS_VALID_DATA||items[i].FmtValue.CStatus==PDH_CSTATUS_NEW_DATA)){total+=std::max(0.0,items[i].FmtValue.doubleValue);found=true;}
+        if(found)g.utilisation=(int)(std::clamp(total,0.0,100.0)+0.5);}
+    PdhCloseQuery(q);return out;
 }
 
 
@@ -349,8 +330,8 @@ void App::layout() {
     place(GetDlgItem(panelContent_,IDC_OPERATION_LOG),x,y,w,S(86)); y+=S(90);
     place(cpuText_,x,y,w,S(22)); y+=S(23);
     place(cpuUsageText_,x,y,w,S(22)); y+=S(23);
-    place(gpuText_,x,y,w,S(22)); y+=S(23);
-    place(gpuUsageText_,x,y,w,S(22)); y+=S(27);
+    place(gpuText_,x,y,w,S(66)); y+=S(67);
+    place(gpuUsageText_,x,y,w,S(66)); y+=S(71);
     place(cpuCombo_,x,y,w,S(200)); y+=S(30);
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
     place(openBtn_,x,y,(w-gap)/2,btn);
@@ -461,15 +442,15 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 prevIdle=idle;prevKernel=kernel;prevUser=user;
             }
 
-            // GPU utilisation is sampled independently from CPU utilisation.
-            // Never infer GPU load from CPU load.
-            if(vulkanReady_){
-                const int gpuUsage=queryGpuUtilisation(utf8ToWide(renderer_.gpuName()));
-                SetWindowTextW(gpuUsageText_,
-                    gpuUsage>=0
-                        ? (L"GPU utilisation: "+std::to_wstring(gpuUsage)+L"%").c_str()
-                        : L"GPU utilisation: unavailable");
-            }
+            const auto adapters=queryGpuAdapters();
+            LUID active{};const bool hasActive=vulkanReady_&&renderer_.gpuLuid(active);
+            std::wstring names,usage;
+            for(size_t i=0;i<adapters.size();++i){const auto& g=adapters[i];const bool selected=hasActive&&g.luid.HighPart==active.HighPart&&g.luid.LowPart==active.LowPart;
+                if(i){names+=L"\r\n";usage+=L"\r\n";}names+=L"GPU "+std::to_wstring(i)+L": "+g.name;
+                names+=g.dedicatedBytes?L" (dedicated)":L" (integrated/shared)";if(selected)names+=L" [Vulkan active]";
+                usage+=L"GPU "+std::to_wstring(i)+L" utilisation: "+(g.utilisation>=0?std::to_wstring(g.utilisation)+L"%":L"unavailable");}
+            if(adapters.empty()){names=L"GPU: no Windows graphics adapters found";usage=L"GPU utilisation: unavailable";}
+            SetWindowTextW(gpuText_,names.c_str());SetWindowTextW(gpuUsageText_,usage.c_str());
         }
         return 0;
     }
