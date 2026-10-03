@@ -41,9 +41,15 @@ void saveCutoutPngWic(const std::filesystem::path& p,const ImageRGBA& image,cons
   ck(encoder->CreateNewFrame(&frame,&bag),"PNG frame failed");
   ck(frame->Initialize(bag),"PNG frame init failed");
   ck(frame->SetSize(image.width,image.height),"PNG dimensions failed");
-  WICPixelFormatGUID fmt=GUID_WICPixelFormat32bppRGBA;
-  ck(frame->SetPixelFormat(&fmt),"PNG RGBA format failed");
-  if(!IsEqualGUID(fmt,GUID_WICPixelFormat32bppRGBA)) throw std::runtime_error("PNG encoder cannot preserve RGBA transparency");
+  // WIC's PNG encoder commonly negotiates 32bppBGRA even when the source image is RGBA.
+  // Supply BGRA pixels directly and accept the encoder's negotiated 32-bit alpha format.
+  WICPixelFormatGUID fmt=GUID_WICPixelFormat32bppBGRA;
+  ck(frame->SetPixelFormat(&fmt),"PNG BGRA format failed");
+  if(!IsEqualGUID(fmt,GUID_WICPixelFormat32bppBGRA) && !IsEqualGUID(fmt,GUID_WICPixelFormat32bppRGBA))
+    throw std::runtime_error("PNG encoder did not provide a 32-bit alpha pixel format");
+  if(IsEqualGUID(fmt,GUID_WICPixelFormat32bppBGRA)){
+    for(size_t i=0;i<count;++i){const size_t j=i*4;std::swap(bgra[j],bgra[j+2]);}
+  }
   ck(frame->WritePixels(image.height,image.width*4,static_cast<UINT>(bgra.size()),bgra.data()),"Cutout PNG write failed");
   ck(frame->Commit(),"Cutout PNG frame commit failed");
   ck(encoder->Commit(),"Cutout PNG commit failed");
