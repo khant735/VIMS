@@ -639,6 +639,16 @@ static Mask deformAtlasBand(const Mask&s,const DeformFrame&f,double xa,double xb
    double u=.5+(x-f.cx[k])/(2*std::max(1.0,f.half[k]));if(u>=xa&&u<=xb)out.pixels[i]=255;
   }}return out;
 }
+
+static Mask atlasTube(const Mask&s,double ax,double ay,double bx,double by,double radius){
+ Mask out{s.width,s.height,std::vector<uint8_t>(s.pixels.size())};int x0,y0,x1,y1;if(!bounds(s,x0,y0,x1,y1))return out;
+ const double W=std::max(1,x1-x0+1),H=std::max(1,y1-y0+1),A=x0+ax*W,B=y0+ay*H,C=x0+bx*W,D=y0+by*H;
+ const double vx=C-A,vy=D-B,ll=std::max(1.0,vx*vx+vy*vy),rr=radius*std::min(W,H);
+ for(int y=y0;y<=y1;++y)for(int x=x0;x<=x1;++x){size_t i=size_t(y)*s.width+x;if(!s.pixels[i])continue;
+  double t=((x-A)*vx+(y-B)*vy)/ll;t=std::clamp(t,0.0,1.0);double dx=x-(A+t*vx),dy=y-(B+t*vy);
+  if(dx*dx+dy*dy<=rr*rr)out.pixels[i]=255;
+ }return out;
+}
 // Geometry-only atlas priors. These never invent pixels outside a detected subject;
 // they partition an existing semantic mask into low-confidence, pose-normalised guide regions.
 static Mask atlasBand(const Mask& subject,double xa,double xb,double ya,double yb){
@@ -710,6 +720,25 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
   band(p+"/Upper body/Left arm/Hand/Knuckles",p+"/Upper body/Left arm/Hand",human,.74,.955,.605,.645,.10f);
   band(p+"/Upper body/Left arm/Hand/Fingers",p+"/Upper body/Left arm/Hand",human,.78,.975,.625,.690,.10f);
   band(p+"/Upper body/Left arm/Hand/Fingernails",p+"/Upper body/Left arm/Hand/Fingers",human,.82,.980,.665,.700,.07f);
+  // Articulated coarse limb tubes: these overlap the silhouette bands and provide a
+  // joint-oriented prior that can later be replaced/refined by specialist keypoints.
+  publish(p+"/Skeleton/Right upper arm",p+"/Skeleton",atlasTube(human,.31,.25,.20,.39,.055),.13f);
+  publish(p+"/Skeleton/Right forearm",p+"/Skeleton",atlasTube(human,.20,.39,.13,.56,.045),.13f);
+  publish(p+"/Skeleton/Left upper arm",p+"/Skeleton",atlasTube(human,.69,.25,.80,.39,.055),.13f);
+  publish(p+"/Skeleton/Left forearm",p+"/Skeleton",atlasTube(human,.80,.39,.87,.56,.045),.13f);
+  publish(p+"/Skeleton/Right thigh",p+"/Skeleton",atlasTube(human,.42,.57,.38,.73,.070),.14f);
+  publish(p+"/Skeleton/Right lower leg",p+"/Skeleton",atlasTube(human,.38,.73,.36,.92,.055),.14f);
+  publish(p+"/Skeleton/Left thigh",p+"/Skeleton",atlasTube(human,.58,.57,.62,.73,.070),.14f);
+  publish(p+"/Skeleton/Left lower leg",p+"/Skeleton",atlasTube(human,.62,.73,.64,.92,.055),.14f);
+  // Five separate digit rays per hand. Low confidence: image/landmark evidence must
+  // outrank these when a hand model is installed.
+  const char* digit[5]={"Thumb","Index finger","Middle finger","Ring finger","Little finger"};
+  for(int d=0;d<5;++d){double q=d/4.0;
+   publish(p+"/Upper body/Right arm/Hand/"+digit[d],p+"/Upper body/Right arm/Hand",
+    atlasTube(human,.20-.055*q,.61+.012*q,.08-.045*q,.67+.018*q,.018),.06f);
+   publish(p+"/Upper body/Left arm/Hand/"+digit[d],p+"/Upper body/Left arm/Hand",
+    atlasTube(human,.80+.055*q,.61+.012*q,.92+.045*q,.67+.018*q,.018),.06f);
+  }
  }
  auto animal=first(animals); if(maskArea(animal)){
   const std::string a="Animals/Animal 1/Atlas";
@@ -729,6 +758,9 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
   band(a+"/Body/Paws hooves claws",a+"/Body",animal,.15,.90,.82,1.0,.11f);
   band(a+"/Body/Tail",a+"/Body",animal,.76,1.0,.12,.72,.11f);
   band(a+"/Body/Wings or fins",a+"/Body",animal,.22,.88,.20,.75,.09f);
+  publish(a+"/Skeleton/Spine",a+"/Skeleton",atlasTube(animal,.24,.32,.80,.32,.055),.10f);
+  publish(a+"/Skeleton/Front limb axis",a+"/Skeleton",atlasTube(animal,.38,.48,.34,.88,.055),.09f);
+  publish(a+"/Skeleton/Hind limb axis",a+"/Skeleton",atlasTube(animal,.72,.48,.76,.88,.055),.09f);
  }
  auto vehicle=first(vehicles); if(maskArea(vehicle)){
   const std::string v="Vehicles/Vehicle 1/Atlas";
@@ -744,6 +776,9 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
   band(v+"/Running gear wheels tyres tracks",v,vehicle,.00,1.0,.68,1.0,.15f);
   band(v+"/Lights bumpers grille",v,vehicle,.00,.25,.40,.88,.11f);
   band(v+"/Mirrors external attachments",v,vehicle,.05,.95,.12,.55,.09f);
+  publish(v+"/Keypoints/Longitudinal centre",v+"/Keypoints",atlasTube(vehicle,.08,.55,.92,.55,.045),.10f);
+  publish(v+"/Keypoints/Front running-gear axis",v+"/Keypoints",atlasTube(vehicle,.22,.72,.22,.93,.055),.09f);
+  publish(v+"/Keypoints/Rear running-gear axis",v+"/Keypoints",atlasTube(vehicle,.78,.72,.78,.93,.055),.09f);
  }
  auto tree=first(trees); if(maskArea(tree)){
   const std::string t="Scenery/Trees/Tree 1/Atlas";
@@ -757,6 +792,9 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
   band(t+"/Trunk/Upper trunk",t+"/Trunk",tree,.36,.64,.42,.72,.16f);
   band(t+"/Trunk/Main trunk bark",t+"/Trunk",tree,.39,.61,.60,.94,.18f);
   band(t+"/Root flare and visible roots",t,tree,.25,.75,.88,1.0,.13f);
+  publish(t+"/Structure/Trunk axis",t+"/Structure",atlasTube(tree,.50,.42,.50,.96,.055),.13f);
+  publish(t+"/Structure/Left primary branch",t+"/Structure",atlasTube(tree,.50,.54,.22,.30,.035),.08f);
+  publish(t+"/Structure/Right primary branch",t+"/Structure",atlasTube(tree,.50,.54,.78,.30,.035),.08f);
  }
  return n;
 }
