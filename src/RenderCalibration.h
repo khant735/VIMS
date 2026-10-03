@@ -29,7 +29,24 @@ enum class CalibrationBackend {
     OpenGLES,
     WebGPU,
     WebGL2,
-    WebGL1
+    WebGL1,
+    Ps2Gs,
+    Ps3Rsx,
+    Ps4Gnm,
+    Ps5Gnm,
+    DreamcastPvr,
+    GameCubeGx,
+    WiiGx,
+    WiiUGx2,
+    SwitchNvn,
+    SwitchVulkan,
+    XboxD3D8,
+    Xbox360D3D9,
+    XboxOneD3D11,
+    XboxSeriesD3D12,
+    PspGu,
+    NvidiaShieldOpenGLES,
+    NvidiaShieldVulkan
 };
 struct CalibrationBackendInfo {
     CalibrationBackend backend;
