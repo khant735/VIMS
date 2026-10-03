@@ -555,16 +555,13 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 resultStyle,resultX,resultY,resultW,resultH,hwnd_,nullptr,instance_,nullptr);
             if(results){
                 RECT rc{};GetClientRect(results,&rc);
-                const int pad=12,buttonH=28,buttonW=90,gap=10;
+                const int pad=12;
                 const int editW=std::max<int>(100,(int)rc.right-pad*2);
-                const int editH=std::max<int>(100,(int)rc.bottom-pad*2-buttonH-gap);
+                const int editH=std::max<int>(100,(int)rc.bottom-pad*2);
                 HWND edit=CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",reportText.c_str(),
                     WS_CHILD|WS_VISIBLE|WS_VSCROLL|ES_LEFT|ES_MULTILINE|ES_AUTOVSCROLL|ES_READONLY|ES_WANTRETURN,
                     pad,pad,editW,editH,results,nullptr,instance_,nullptr);
-                HWND close=CreateWindowW(L"BUTTON",L"Close",WS_CHILD|WS_VISIBLE|BS_DEFPUSHBUTTON,
-                    rc.right-pad-buttonW,pad+editH+gap,buttonW,buttonH,results,(HMENU)IDCANCEL,instance_,nullptr);
                 SendMessageW(edit,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);
-                SendMessageW(close,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);
                 SetFocus(edit);
             }else MessageBoxW(hwnd_,reportText.c_str(),L"Render Test / Calibration",MB_OK|MB_ICONINFORMATION);
         }
