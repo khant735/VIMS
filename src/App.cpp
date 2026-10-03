@@ -515,25 +515,25 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 }else report<<L"  Vulkan device/render: not tested (renderer currently bound to another adapter)\r\n";
                 report<<L"  DirectML per-adapter compute: pending scheduler implementation\r\n\r\n";
             }
-            report<<L"\\r\\n=PLATFORM COMPATIBILITY PROBES=\\r\\n\\r\\n";
-            report<<L"These are Windows-side theoretical checks.\\r\\n";
-            report<<L"They do not mean the gears were rendered on the real console, mobile device or browser.\\r\\n\\r\\n";
+            report<<L"\r\n=PLATFORM COMPATIBILITY PROBES=\r\n\r\n";
+            report<<L"These are Windows-side theoretical checks.\r\n";
+            report<<L"They do not mean the gears were rendered on the real console, mobile device or browser.\r\n\r\n";
             for(const auto& r:theoreticalCalibrationResults()){
                 const auto& all=calibrationBackends();
                 auto it=std::find_if(all.begin(),all.end(),[&](const CalibrationBackendInfo& b){return b.backend==r.backend;});
                 if(it==all.end()||!it->internetEligible)continue;
-                report<<it->name<<L"\\r\\n";
-                report<<L"  Result: "<<calibrationResultName(r.kind)<<L"\\r\\n";
+                report<<it->name<<L"\r\n";
+                report<<L"  Result: "<<calibrationResultName(r.kind)<<L"\r\n";
                 if(r.kind==CalibrationResultKind::TranslationRequired)
-                    report<<L"  Note: "<<r.detail<<L"\\r\\n";
-                report<<L"\\r\\n";
+                    report<<L"  Note: "<<r.detail<<L"\r\n";
+                report<<L"\r\n";
             }
-            report<<L"=RESULT KEY=\\r\\n\\r\\n";
-            report<<L"RENDER PASS              = Frames were actually rendered and presented by that Windows backend.\\r\\n";
-            report<<L"THEORETICALLY COMPATIBLE = Scene requirements fit the target profile; real target hardware was not executed.\\r\\n";
-            report<<L"TRANSLATION REQUIRED      = A translation layer is required for that target.\\r\\n";
-            report<<L"UNAVAILABLE               = Backend or capability is not available for the test.\\r\\n\\r\\n";
-            report<<L"Calibration scene: two VIMS-generated animated 3D gears with an orbiting camera.\\r\\n";
+            report<<L"=RESULT KEY=\r\n\r\n";
+            report<<L"RENDER PASS              = Frames were actually rendered and presented by that Windows backend.\r\n";
+            report<<L"THEORETICALLY COMPATIBLE = Scene requirements fit the target profile; real target hardware was not executed.\r\n";
+            report<<L"TRANSLATION REQUIRED      = A translation layer is required for that target.\r\n";
+            report<<L"UNAVAILABLE               = Backend or capability is not available for the test.\r\n\r\n";
+            report<<L"Calibration scene: two VIMS-generated animated 3D gears with an orbiting camera.\r\n";
             {
                 std::error_code ec; std::filesystem::create_directories(L"Logs",ec);
                 SYSTEMTIME st{};GetLocalTime(&st);wchar_t stamp[64]{};
