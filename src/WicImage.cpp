@@ -17,8 +17,12 @@ void saveCutoutPngWic(const std::filesystem::path& p,const ImageRGBA& image,cons
  std::vector<BYTE> bgra(count*4);
  for(size_t i=0;i<count;++i){
   const size_t j=i*4;
-  bgra[j]=image.pixels[j]; bgra[j+1]=image.pixels[j+1]; bgra[j+2]=image.pixels[j+2];
-  bgra[j+3]=static_cast<BYTE>((unsigned(image.pixels[j+3])*unsigned(mask.pixels[i])+127)/255);
+  const BYTE alpha=static_cast<BYTE>((unsigned(image.pixels[j+3])*unsigned(mask.pixels[i])+127)/255);
+  bgra[j+3]=alpha;
+  // Fully transparent RGB is invisible but otherwise retains the entire source photograph,
+  // which severely reduces PNG compression. Canonicalize only alpha-zero pixels.
+  if(alpha==0){bgra[j]=0;bgra[j+1]=0;bgra[j+2]=0;}
+  else {bgra[j]=image.pixels[j];bgra[j+1]=image.pixels[j+1];bgra[j+2]=image.pixels[j+2];}
  }
  CoInitializeEx(nullptr,COINIT_MULTITHREADED);
  IWICImagingFactory* f=nullptr;
