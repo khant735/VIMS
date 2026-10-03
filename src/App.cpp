@@ -44,7 +44,7 @@ bool withinGuide(const RECT& r,double angle,double x,double y){
     return std::abs(p.x)<=(r.right-r.left)*.5&&std::abs(p.y)<=(r.bottom-r.top)*.5;
 }
 enum : int {
-    IDC_OPEN = 1001, IDC_ANALYSE, IDC_MASKLIST, IDC_BOUNDARY, IDC_TRANSPARENT_CUTOUT, IDC_EXPORT, IDC_EXPORT_ALL, IDC_CPUCOMBO, IDC_BACKENDCOMBO, IDC_REFINE_ENABLE, IDC_BOUNDARY_SLIDER, IDC_MATERIAL_SLIDER, IDC_COLOUR_SLIDER, IDC_RADIUS_SLIDER, IDC_FILL_HOLES, IDC_REMOVE_ISLANDS, IDC_PROTECT_SKIN, IDC_RAW_VIEW, IDC_REFINED_VIEW, IDC_RESET_REFINE, IDC_FACE_MODEL, IDC_DIAGNOSTICS, IDC_GUIDE, IDC_APPLY_GUIDE, IDC_RESET_GUIDE, IDC_CREATE_PART, IDC_APPROVE_MASK, IDC_POSE_GIF, IDC_ZOOM_IN, IDC_ZOOM_OUT, IDC_ZOOM_FIT, IDC_OPERATION_DETAIL, IDC_OPERATION_LOG
+    IDC_OPEN = 1001, IDC_ANALYSE, IDC_MASKLIST, IDC_BOUNDARY, IDC_TRANSPARENT_CUTOUT, IDC_EXPORT, IDC_EXPORT_ALL, IDC_CPUCOMBO, IDC_BACKENDCOMBO, IDC_REFINE_ENABLE, IDC_BOUNDARY_SLIDER, IDC_MATERIAL_SLIDER, IDC_COLOUR_SLIDER, IDC_RADIUS_SLIDER, IDC_FILL_HOLES, IDC_REMOVE_ISLANDS, IDC_PROTECT_SKIN, IDC_RAW_VIEW, IDC_REFINED_VIEW, IDC_RESET_REFINE, IDC_FACE_MODEL, IDC_DIAGNOSTICS, IDC_GUIDE, IDC_APPLY_GUIDE, IDC_RESET_GUIDE, IDC_CREATE_PART, IDC_APPROVE_MASK, IDC_POSE_GIF, IDC_ZOOM_IN, IDC_ZOOM_OUT, IDC_ZOOM_FIT, IDC_OPERATION_DETAIL, IDC_OPERATION_LOG, IDC_GPU_SELFTEST
 };
 
 std::wstring utf8ToWide(const std::string& s) {
@@ -227,6 +227,8 @@ void App::createUi() {
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_OPEN), instance_, nullptr);
     analyseBtn_ = CreateWindowW(L"BUTTON", L"Analyse image", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_ANALYSE), instance_, nullptr);
+    gpuSelfTestBtn_ = CreateWindowW(L"BUTTON", L"GPU cog self-test", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_GPU_SELFTEST), instance_, nullptr);
     diagnosticsBtn_ = CreateWindowW(L"BUTTON", L"Runtime diagnostics", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_DIAGNOSTICS), instance_, nullptr);
 
@@ -341,6 +343,7 @@ void App::layout() {
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
     place(openBtn_,x,y,(w-gap)/2,btn);
     place(analyseBtn_,x+(w+gap)/2,y,(w-gap)/2,btn);y+=S(36);
+    place(gpuSelfTestBtn_,x,y,w,btn);y+=S(36);
     place(diagnosticsBtn_,x,y,w,btn);y+=S(36);
 
     const int groupH=S(300);
@@ -467,6 +470,26 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
         else if (id == IDC_ZOOM_OUT && code == BN_CLICKED)zoomPreview(1/1.5);
         else if (id == IDC_OPEN && code == BN_CLICKED) openImage();
         else if (id == IDC_ANALYSE && code == BN_CLICKED) analyse();
+        else if (id == IDC_GPU_SELFTEST && code == BN_CLICKED){
+            const auto adapters=queryGpuAdapters();
+            LUID active{};const bool hasActive=vulkanReady_&&renderer_.gpuLuid(active);
+            std::wstringstream report;report<<L"VIMS GPU Cog Self-Test\r\n\r\n";
+            if(adapters.empty()) report<<L"No hardware GPU is exposed to Windows/DXGI. A firmware-disabled or driver-disabled iGPU cannot be render-tested.\r\n";
+            for(size_t i=0;i<adapters.size();++i){
+                const auto& g=adapters[i];const bool selected=hasActive&&g.luid.HighPart==active.HighPart&&g.luid.LowPart==active.LowPart;
+                report<<L"GPU "<<i<<L": "<<g.name<<L"\r\n  DXGI detection: PASS\r\n";
+                report<<L"  Adapter type: "<<(g.dedicatedBytes?L"dedicated/local-memory":L"integrated/shared-memory")<<L"\r\n";
+                if(selected){
+                    const ULONGLONG start=GetTickCount64();unsigned frames=0;
+                    while(GetTickCount64()-start<2000){renderer_.draw();++frames;}
+                    const double seconds=std::max(0.001,double(GetTickCount64()-start)/1000.0);
+                    report<<L"  Vulkan device: PASS [active renderer]\r\n  Cog-style render workload: PASS ("<<std::fixed<<std::setprecision(1)<<(frames/seconds)<<L" frames/s)\r\n";
+                }else report<<L"  Vulkan device/render: not tested (renderer currently bound to another adapter)\r\n";
+                report<<L"  DirectML per-adapter compute: pending scheduler implementation\r\n\r\n";
+            }
+            report<<L"Note: this test intentionally uses a VIMS-generated rotating-workload concept; it does not copy Cogs game assets.";
+            MessageBoxW(hwnd_,report.str().c_str(),L"GPU Cog Self-Test",MB_OK|MB_ICONINFORMATION);
+        }
         else if (id == IDC_DIAGNOSTICS && code == BN_CLICKED) runtimeDiagnostics(true);
         else if (id == IDC_EXPORT && code == BN_CLICKED) exportSelected();
         else if (id == IDC_EXPORT_ALL && code == BN_CLICKED) exportAll();
