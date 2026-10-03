@@ -66,11 +66,13 @@ private:
     AnalysisResult analysis_;
     std::jthread worker_;
     bool analysing_ = false;
+    int analysisProgress_ = 0;
     bool downloadingFaceModel_ = false;
     std::jthread modelWorker_;
 
     static constexpr UINT WM_ANALYSIS_DONE = WM_APP + 10;
     static constexpr UINT WM_FACE_MODEL_DONE = WM_APP + 11;
+    static constexpr UINT WM_ANALYSIS_PROGRESS = WM_APP + 12;
     static LRESULT CALLBACK wndProc(HWND, UINT, WPARAM, LPARAM);
     static LRESULT CALLBACK panelProc(HWND, UINT, WPARAM, LPARAM);
     static LRESULT CALLBACK viewProc(HWND, UINT, WPARAM, LPARAM);
