@@ -41,7 +41,7 @@ bool withinGuide(const RECT& r,double angle,double x,double y){
     return std::abs(p.x)<=(r.right-r.left)*.5&&std::abs(p.y)<=(r.bottom-r.top)*.5;
 }
 enum : int {
-    IDC_OPEN = 1001, IDC_ANALYSE, IDC_MASKLIST, IDC_BOUNDARY, IDC_TRANSPARENT_CUTOUT, IDC_EXPORT, IDC_EXPORT_ALL, IDC_CPUCOMBO, IDC_BACKENDCOMBO, IDC_REFINE_ENABLE, IDC_BOUNDARY_SLIDER, IDC_MATERIAL_SLIDER, IDC_COLOUR_SLIDER, IDC_RADIUS_SLIDER, IDC_FILL_HOLES, IDC_REMOVE_ISLANDS, IDC_PROTECT_SKIN, IDC_RAW_VIEW, IDC_REFINED_VIEW, IDC_RESET_REFINE, IDC_FACE_MODEL, IDC_DIAGNOSTICS, IDC_GUIDE, IDC_APPLY_GUIDE, IDC_RESET_GUIDE, IDC_CREATE_PART, IDC_APPROVE_MASK, IDC_POSE_GIF, IDC_ZOOM_IN, IDC_ZOOM_OUT, IDC_ZOOM_FIT
+    IDC_OPEN = 1001, IDC_ANALYSE, IDC_MASKLIST, IDC_BOUNDARY, IDC_TRANSPARENT_CUTOUT, IDC_EXPORT, IDC_EXPORT_ALL, IDC_CPUCOMBO, IDC_BACKENDCOMBO, IDC_REFINE_ENABLE, IDC_BOUNDARY_SLIDER, IDC_MATERIAL_SLIDER, IDC_COLOUR_SLIDER, IDC_RADIUS_SLIDER, IDC_FILL_HOLES, IDC_REMOVE_ISLANDS, IDC_PROTECT_SKIN, IDC_RAW_VIEW, IDC_REFINED_VIEW, IDC_RESET_REFINE, IDC_FACE_MODEL, IDC_DIAGNOSTICS, IDC_GUIDE, IDC_APPLY_GUIDE, IDC_RESET_GUIDE, IDC_CREATE_PART, IDC_APPROVE_MASK, IDC_POSE_GIF, IDC_ZOOM_IN, IDC_ZOOM_OUT, IDC_ZOOM_FIT, IDC_OPERATION_DETAIL, IDC_OPERATION_LOG
 };
 
 std::wstring utf8ToWide(const std::string& s) {
@@ -171,6 +171,10 @@ void App::createUi() {
         0,0,100,18,panelContent_,nullptr,instance_,nullptr);
     SendMessageW(operationProgress_,PBM_SETRANGE,0,MAKELPARAM(0,100));
     SendMessageW(operationProgress_,PBM_SETPOS,0,0);
+    CreateWindowW(L"STATIC",L"Open an image to begin.",WS_CHILD|WS_VISIBLE|SS_LEFT,
+        0,0,100,54,panelContent_,reinterpret_cast<HMENU>(IDC_OPERATION_DETAIL),instance_,nullptr);
+    CreateWindowExW(WS_EX_CLIENTEDGE,L"LISTBOX",nullptr,WS_CHILD|WS_VISIBLE|WS_VSCROLL|LBS_NOINTEGRALHEIGHT,
+        0,0,100,82,panelContent_,reinterpret_cast<HMENU>(IDC_OPERATION_LOG),instance_,nullptr);
     cpuCombo_ = CreateWindowW(L"COMBOBOX", nullptr, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
         0,0,100,200, panelContent_, reinterpret_cast<HMENU>(IDC_CPUCOMBO), instance_, nullptr);
     SendMessageW(cpuCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Auto CPU threads"));
@@ -291,7 +295,9 @@ void App::layout() {
     place(cpuText_,x,y,w,S(24)); y+=S(26);
     place(gpuText_,x,y,w,S(24)); y+=S(26);
     place(operationLabel_,x,y,w,S(20)); y+=S(21);
-    place(operationProgress_,x,y,w,S(18)); y+=S(24);
+    place(operationProgress_,x,y,w,S(18)); y+=S(22);
+    place(GetDlgItem(panelContent_,IDC_OPERATION_DETAIL),x,y,w,S(54)); y+=S(58);
+    place(GetDlgItem(panelContent_,IDC_OPERATION_LOG),x,y,w,S(82)); y+=S(88);
     place(cpuCombo_,x,y,w,S(200)); y+=S(30);
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
     place(openBtn_,x,y,(w-gap)/2,btn);
@@ -380,7 +386,27 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
         if((w&0xfff0)==SC_RESTORE){if(IsIconic(h))ShowWindow(h,SW_SHOWMAXIMIZED);return 0;}
         if((w&0xfff0)==SC_SIZE||(w&0xfff0)==SC_MOVE||(w&0xfff0)==SC_MAXIMIZE)return 0;
         break;
-    case WM_TIMER: if(vulkanReady_) renderer_.draw(); return 0;
+    case WM_TIMER: {
+        if(vulkanReady_) renderer_.draw();
+        static ULONGLONG lastTick=0; const ULONGLONG nowTick=GetTickCount64();
+        if(nowTick-lastTick>=1000){
+            lastTick=nowTick;
+            static ULONGLONG prevIdle=0,prevKernel=0,prevUser=0;
+            FILETIME idleFt{},kernelFt{},userFt{};
+            if(GetSystemTimes(&idleFt,&kernelFt,&userFt)){
+                auto q=[](const FILETIME& ft){return (ULONGLONG(ft.dwHighDateTime)<<32)|ft.dwLowDateTime;};
+                const ULONGLONG idle=q(idleFt),kernel=q(kernelFt),user=q(userFt);
+                if(prevKernel||prevUser){
+                    const ULONGLONG total=(kernel-prevKernel)+(user-prevUser), idleDelta=idle-prevIdle;
+                    const int usage=total?int(std::clamp(100.0*(double(total-idleDelta)/double(total)),0.0,100.0)+0.5):0;
+                    std::wstring cpu=L"CPU: "+cpu_.description()+L" | Usage: "+std::to_wstring(usage)+L"%";
+                    SetWindowTextW(cpuText_,cpu.c_str());
+                }
+                prevIdle=idle;prevKernel=kernel;prevUser=user;
+            }
+        }
+        return 0;
+    }
     case WM_HSCROLL: updateRefinementLabels(); return 0;
     case WM_COMMAND: {
         const int id = LOWORD(w), code = HIWORD(w);
@@ -429,16 +455,37 @@ RefinementSettings App::refinementSettings() const {RefinementSettings r;r.enabl
 void App::updateRefinementLabels(){wchar_t b[80];swprintf(b,80,L"Boundary Precision: %ld",SendMessageW(boundarySlider_,TBM_GETPOS,0,0));SetWindowTextW(boundaryValue_,b);swprintf(b,80,L"Material Continuity: %ld",SendMessageW(materialSlider_,TBM_GETPOS,0,0));SetWindowTextW(materialValue_,b);swprintf(b,80,L"Colour Tolerance: %ld",SendMessageW(colourSlider_,TBM_GETPOS,0,0));SetWindowTextW(colourValue_,b);swprintf(b,80,L"Refinement Radius: %ld px",SendMessageW(radiusSlider_,TBM_GETPOS,0,0));SetWindowTextW(radiusValue_,b);}
 void App::resetRefinementControls(){SendMessageW(refineEnable_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(boundarySlider_,TBM_SETPOS,TRUE,70);SendMessageW(materialSlider_,TBM_SETPOS,TRUE,65);SendMessageW(colourSlider_,TBM_SETPOS,TRUE,55);SendMessageW(radiusSlider_,TBM_SETPOS,TRUE,8);SendMessageW(fillHoles_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(removeIslands_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(protectSkin_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(refinedView_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(rawView_,BM_SETCHECK,BST_UNCHECKED,0);showRaw_=false;updateRefinementLabels();}
 
-void App::setStatus(const std::wstring& s) { SetWindowTextW(status_, s.c_str()); if(operationLabel_) SetWindowTextW(operationLabel_, s.c_str()); }
+void App::setStatus(const std::wstring& s) {
+    SetWindowTextW(status_,s.c_str());
+    if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL)) SetWindowTextW(detail,s.c_str());
+    if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)){
+        SYSTEMTIME t{};GetLocalTime(&t);wchar_t stamp[32]{};swprintf(stamp,32,L"[%02u:%02u:%02u] ",t.wHour,t.wMinute,t.wSecond);
+        std::wstring line=stamp+s;SendMessageW(log,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(line.c_str()));
+        const LRESULT count=SendMessageW(log,LB_GETCOUNT,0,0);if(count>200)SendMessageW(log,LB_DELETESTRING,0,0);
+        SendMessageW(log,LB_SETTOPINDEX,std::max<LRESULT>(0,count-6),0);
+    }
+}
 void App::beginOperation(const std::wstring& label,int percent){
     SetWindowTextW(operationLabel_,label.c_str());
-    InvalidateRect(operationLabel_,nullptr,TRUE); UpdateWindow(operationLabel_);
+    if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL)) SetWindowTextW(detail,L"Working...");
+    if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)){SendMessageW(log,LB_RESETCONTENT,0,0);SendMessageW(log,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(label.c_str()));}
     LONG style=GetWindowLongW(operationProgress_,GWL_STYLE);
     if(percent<0){SetWindowLongW(operationProgress_,GWL_STYLE,style|PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETMARQUEE,TRUE,35);}
     else{SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);SetWindowLongW(operationProgress_,GWL_STYLE,style&~PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);}
+    RedrawWindow(panelContent_,nullptr,nullptr,RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW);
 }
-void App::updateOperation(const std::wstring& label,int percent){SetWindowTextW(operationLabel_,label.c_str());if(percent>=0)SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);InvalidateRect(operationLabel_,nullptr,TRUE);UpdateWindow(operationLabel_);UpdateWindow(operationProgress_);}
-void App::endOperation(){SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);SendMessageW(operationProgress_,PBM_SETPOS,0,0);InvalidateRect(operationProgress_,nullptr,TRUE);UpdateWindow(operationProgress_);}
+void App::updateOperation(const std::wstring& label,int percent){
+    SetWindowTextW(operationLabel_,label.c_str());
+    if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL)) SetWindowTextW(detail,label.c_str());
+    if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)) SendMessageW(log,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(label.c_str()));
+    if(percent>=0)SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);
+    RedrawWindow(panelContent_,nullptr,nullptr,RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW);
+}
+void App::endOperation(){
+    SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);
+    SendMessageW(operationProgress_,PBM_SETPOS,100,0);
+    InvalidateRect(operationProgress_,nullptr,TRUE);UpdateWindow(operationProgress_);
+}
 void App::showError(const std::wstring& title, const std::wstring& message) { MessageBoxW(hwnd_, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR); }
 
 void App::openImage() {
@@ -540,6 +587,7 @@ void App::analyse() {
     setStatus(backend==2?L"Analysing on CPU...":backend==1?L"Analysing with DirectML...":L"Analysing with automatic device selection...");
 
     beginOperation(L"Analysing image...",-1);
+    setStatus(L"Running segmentation and refinement. ONNX inference stages without progress callbacks use an activity bar.");
     ImageRGBA input = image_;
     const std::string cpuChoice=sel==1?"Physical cores (SMT off)":sel==2?"SMT 25%":sel==3?"SMT 50%":sel==4?"SMT 75%":sel==5?"SMT 100%":"Auto CPU threads";
     const std::string gpuChoice=backend==1?"DirectML required":backend==2?"CPU only":"Auto";
@@ -1056,11 +1104,13 @@ void App::exportPoseGifs(){
         if(!GetSaveFileNameW(&dialog))return;
         chosen=filename;
     }
-    beginOperation(L"Generating 30-second pose GIF...",-1);
+    beginOperation(L"Generating 30-second pose GIF...",0);
     EnableWindow(poseGifBtn_,FALSE);
     SetCursor(LoadCursor(nullptr,IDC_WAIT));
     size_t completed=0,approximate=0;std::string errors;
+    size_t subjectIndex=0;
     for(const auto& subject:subjects){
+        updateOperation(L"Pose GIF: subject "+std::to_wstring(subjectIndex+1)+L" of "+std::to_wstring(subjects.size()),int((subjectIndex*90)/subjects.size()));
         setStatus(L"Rendering 30-second pose GIF for "+widen(subject)+L"...");
         UpdateWindow(hwnd_);
         const auto dest=chosen.empty()?folder/widen(safeFileName(subject)+"_30s_poses.gif"):chosen;
@@ -1071,7 +1121,7 @@ void App::exportPoseGifs(){
                 throw std::runtime_error("GIF frame count or duration is incorrect");
             if(!MoveFileExW(temp.c_str(),dest.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
                 throw std::runtime_error("Could not finish GIF in Exports/PoseGIFs");
-            ++completed;approximate+=result.approximateLimbs;
+            ++completed;++subjectIndex;approximate+=result.approximateLimbs;
         }catch(const std::exception& e){
             std::error_code ignored;std::filesystem::remove(temp,ignored);
             if(!errors.empty())errors+="; ";errors+=subject+": "+e.what();
