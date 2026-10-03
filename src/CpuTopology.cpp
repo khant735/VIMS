@@ -1,6 +1,7 @@
 #include "CpuTopology.h"
 #include <bit>
 #include <sstream>
+#include <intrin.h>
 
 static DWORD_PTR lowestBit(DWORD_PTR v) {
     return v & (~v + 1);
@@ -88,4 +89,25 @@ std::wstring CpuTopology::description() const {
        << L" / " << logicalProcessors_ << L" logical processor" << (logicalProcessors_ == 1 ? L"" : L"s");
     if (smtAvailable()) ss << L" (SMT/Hyper-Threading detected)";
     return ss.str();
+}
+
+std::wstring CpuTopology::name() const {
+    int regs[4]{};
+    char brand[49]{};
+    __cpuid(regs, 0x80000000);
+    const unsigned maxExt=static_cast<unsigned>(regs[0]);
+    if(maxExt>=0x80000004){
+        for(unsigned leaf=0x80000002, offset=0; leaf<=0x80000004; ++leaf, offset+=16){
+            __cpuid(regs, static_cast<int>(leaf));
+            memcpy(brand+offset, regs, 16);
+        }
+        std::string s(brand);
+        const auto first=s.find_first_not_of(' ');
+        const auto last=s.find_last_not_of(' ');
+        if(first!=std::string::npos){
+            s=s.substr(first,last-first+1);
+            return std::wstring(s.begin(),s.end());
+        }
+    }
+    return L"Unknown CPU";
 }
