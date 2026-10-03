@@ -611,6 +611,31 @@ static size_t addSkinSurfaceAtlas(AnalysisResult& r,const ImageRGBA& im,const Ma
  publish("Hair follicle or strand-like dark edge cues",hair,.14f);
  return n;
 }
+// A lightweight deformable frame estimated from the silhouette itself. It gives the
+// atlas a subject-relative centreline and row-wise width, so regions follow lean/pose
+// instead of being clipped only by a fixed bounding box.
+struct DeformFrame{int y0=0,y1=-1;std::vector<double> cx,half;bool valid=false;};
+static DeformFrame estimateDeformFrame(const Mask&s){
+ DeformFrame f;int x0,y0,x1,y1;if(!bounds(s,x0,y0,x1,y1))return f;f.y0=y0;f.y1=y1;
+ f.cx.assign(size_t(y1-y0+1),(x0+x1)*.5);f.half.assign(f.cx.size(),std::max(1,(x1-x0+1)/2));
+ for(int y=y0;y<=y1;++y){long sx=0,n=0;int lo=s.width,hi=-1;
+  for(int x=x0;x<=x1;++x)if(s.pixels[size_t(y)*s.width+x]){sx+=x;++n;lo=std::min(lo,x);hi=std::max(hi,x);}
+  if(n){size_t k=size_t(y-y0);f.cx[k]=double(sx)/n;f.half[k]=std::max(2.0,(hi-lo+1)*.5);}
+ }
+ // Smooth abrupt segmentation noise while retaining pose lean.
+ for(int pass=0;pass<2;++pass){auto cx=f.cx,hw=f.half;for(size_t k=1;k+1<f.cx.size();++k){
+   f.cx[k]=(cx[k-1]+2*cx[k]+cx[k+1])/4;f.half[k]=(hw[k-1]+2*hw[k]+hw[k+1])/4;
+ }}
+ f.valid=true;return f;
+}
+static Mask deformAtlasBand(const Mask&s,const DeformFrame&f,double xa,double xb,double ya,double yb){
+ Mask out{s.width,s.height,std::vector<uint8_t>(s.pixels.size())};if(!f.valid)return out;
+ const double h=std::max(1,f.y1-f.y0+1);
+ for(int y=f.y0;y<=f.y1;++y){double v=(y-f.y0+.5)/h;if(v<ya||v>yb)continue;size_t k=size_t(y-f.y0);
+  for(int x=0;x<s.width;++x){size_t i=size_t(y)*s.width+x;if(!s.pixels[i])continue;
+   double u=.5+(x-f.cx[k])/(2*std::max(1.0,f.half[k]));if(u>=xa&&u<=xb)out.pixels[i]=255;
+  }}return out;
+}
 // Geometry-only atlas priors. These never invent pixels outside a detected subject;
 // they partition an existing semantic mask into low-confidence, pose-normalised guide regions.
 static Mask atlasBand(const Mask& subject,double xa,double xb,double ya,double yb){
@@ -634,6 +659,12 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
  auto band=[&](const std::string& name,const std::string& parent,const Mask&s,double xa,double xb,double ya,double yb,float cf){publish(name,parent,atlasBand(s,xa,xb,ya,yb),cf);};
  auto human=first(people); if(maskArea(human)){
   const std::string p="People/Human/Person 1/Atlas";
+  const DeformFrame humanFrame=estimateDeformFrame(human);
+  // Replace the fixed horizontal coordinate with the silhouette centreline. Existing
+  // atlas definitions below now bend/lean with the detected person.
+  band=[&](const std::string& name,const std::string& parent,const Mask&s,double xa,double xb,double ya,double yb,float cf){
+   publish(name,parent,(&s==&human&&humanFrame.valid)?deformAtlasBand(s,humanFrame,xa,xb,ya,yb):atlasBand(s,xa,xb,ya,yb),cf);
+  };
   // Whole-body reference: regions overlap intentionally at joints because this is a prior, not ground truth.
   band(p+"/Head/Scalp",p+"/Head",human,.31,.69,.00,.075,.22f);
   band(p+"/Head/Face",p+"/Head",human,.31,.69,.045,.165,.26f);
