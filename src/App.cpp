@@ -74,9 +74,11 @@ std::vector<GpuSample> queryGpuAdapters(){
     PdhCollectQueryData(q);Sleep(100);if(PdhCollectQueryData(q)!=ERROR_SUCCESS){PdhCloseQuery(q);return out;}
     DWORD bytes=0,n=0;PdhGetFormattedCounterArrayW(ctr,PDH_FMT_DOUBLE,&bytes,&n,nullptr);if(!bytes){PdhCloseQuery(q);return out;}
     std::vector<unsigned char> mem(bytes);auto* items=(PDH_FMT_COUNTERVALUE_ITEM_W*)mem.data();
-    if(PdhGetFormattedCounterArrayW(ctr,PDH_FMT_DOUBLE,&bytes,&n,items)==ERROR_SUCCESS)for(auto& g:out){double total=0;bool found=false;auto token=luidToken(g.luid);
-        for(DWORD i=0;i<n;++i)if(items[i].szName&&lowerCopy(items[i].szName).find(token)!=std::wstring::npos){total+=std::max(0.0,items[i].FmtValue.doubleValue);found=true;}
-        if(found)g.utilisation=(int)(std::clamp(total,0.0,100.0)+0.5);}
+    if(PdhGetFormattedCounterArrayW(ctr,PDH_FMT_DOUBLE,&bytes,&n,items)==ERROR_SUCCESS)for(auto& g:out){double busiest=0;bool found=false;auto tokens=luidTokens(g.luid);
+        for(DWORD i=0;i<n;++i)if(items[i].szName){auto instance=lowerCopy(items[i].szName);
+            if(instance.find(tokens[0])!=std::wstring::npos||instance.find(tokens[1])!=std::wstring::npos){busiest=std::max(busiest,std::max(0.0,items[i].FmtValue.doubleValue));found=true;}}
+        if(found)g.utilisation=(int)(std::clamp(busiest,0.0,100.0)+0.5);
+    }
     PdhCloseQuery(q);return out;
 }
 
