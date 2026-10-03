@@ -288,7 +288,10 @@ void App::layout() {
     int x=pad,y=pad,w=available;
     const int row=S(24), btn=S(30), labelW=std::clamp(int(w*.48),S(175),S(245));
 
-    place(cpuText_,x,y,w,S(24)); y+=S(26);\n    place(gpuText_,x,y,w,S(24)); y+=S(26);\n    place(operationLabel_,x,y,w,S(20)); y+=S(21);\n    place(operationProgress_,x,y,w,S(18)); y+=S(24);
+    place(cpuText_,x,y,w,S(24)); y+=S(26);
+    place(gpuText_,x,y,w,S(24)); y+=S(26);
+    place(operationLabel_,x,y,w,S(20)); y+=S(21);
+    place(operationProgress_,x,y,w,S(18)); y+=S(24);
     place(cpuCombo_,x,y,w,S(200)); y+=S(30);
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
     place(openBtn_,x,y,(w-gap)/2,btn);
@@ -463,29 +466,39 @@ static std::wstring winErrorText(DWORD e) {
     DWORD n=FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
         nullptr,e,0,reinterpret_cast<LPWSTR>(&p),0,nullptr);
     std::wstring s=(n&&p)?std::wstring(p,n):L"Unknown Windows loader error";
-    if(p) LocalFree(p); while(!s.empty()&&(s.back()==L'\r'||s.back()==L'\n'))s.pop_back(); return s;
+    if(p) LocalFree(p); while(!s.empty()&&(s.back()==L'\r'||s.back()==L'
+'))s.pop_back(); return s;
 }
 
 bool App::runtimeDiagnostics(bool interactive) {
     const int backend=static_cast<int>(SendMessageW(backendCombo_,CB_GETCURSEL,0,0));
     std::wstringstream out; bool ok=true;
-    out << L"Vulkan Image Mask Studio 0.4.12.13 (ZIP/RGBA build) runtime diagnostics\r\n\r\n";
+    out << L"Vulkan Image Mask Studio 0.4.12.13 (ZIP/RGBA build) runtime diagnostics\r
+\r
+";
     auto checkSystem=[&](const wchar_t* name, bool required){
         SetLastError(0); HMODULE h=LoadLibraryExW(name,nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
-        if(h){out<<L"[OK] "<<name<<L" (Windows system runtime)\r\n";FreeLibrary(h);return true;}
-        DWORD e=GetLastError();out<<(required?L"[FAIL] ":L"[WARN] ")<<name<<L" - "<<winErrorText(e)<<L" (error "<<e<<L")\r\n";
+        if(h){out<<L"[OK] "<<name<<L" (Windows system runtime)\r
+";FreeLibrary(h);return true;}
+        DWORD e=GetLastError();out<<(required?L"[FAIL] ":L"[WARN] ")<<name<<L" - "<<winErrorText(e)<<L" (error "<<e<<L")\r
+";
         if(required)ok=false;return false;
     };
     checkSystem(L"VCRUNTIME140.dll",true); checkSystem(L"VCRUNTIME140_1.dll",true); checkSystem(L"MSVCP140.dll",true); checkSystem(L"MSVCP140_1.dll",true); checkSystem(L"d3d12.dll",backend==1);
-    out<<L"\r\nApplication runtimes\r\n";
+    out<<L"\r
+Application runtimes\r
+";
     auto checkLocal=[&](const wchar_t* name, const char* symbol, bool required){
         auto path=exeDir()/name;
-        if(!std::filesystem::exists(path)){out<<(required?L"[FAIL] ":L"[WARN] ")<<name<<L" - file is missing beside the executable.\r\n";if(required)ok=false;return false;}
+        if(!std::filesystem::exists(path)){out<<(required?L"[FAIL] ":L"[WARN] ")<<name<<L" - file is missing beside the executable.\r
+";if(required)ok=false;return false;}
         SetLastError(0); HMODULE h=LoadLibraryExW(path.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-        if(!h){DWORD e=GetLastError();out<<L"[FAIL] "<<name<<L" exists but Windows cannot load it: "<<winErrorText(e)<<L" (error "<<e<<L")\r\n";ok=false;return false;}
+        if(!h){DWORD e=GetLastError();out<<L"[FAIL] "<<name<<L" exists but Windows cannot load it: "<<winErrorText(e)<<L" (error "<<e<<L")\r
+";ok=false;return false;}
         bool symok=!symbol||GetProcAddress(h,symbol)!=nullptr;
         out<<(symok?L"[OK] ":L"[FAIL] ")<<name;
-        if(symbol)out<<(symok?L" - required API export found.":L" - required API export is missing.");out<<L"\r\n";
+        if(symbol)out<<(symok?L" - required API export found.":L" - required API export is missing.");out<<L"\r
+";
         if(!symok)ok=false;FreeLibrary(h);return symok;
     };
     checkLocal(L"vulkan-1.dll",nullptr,true); checkLocal(L"libc++.dll",nullptr,true); checkLocal(L"libunwind.dll",nullptr,true);
@@ -494,10 +507,12 @@ bool App::runtimeDiagnostics(bool interactive) {
     if(ort){
         auto path=exeDir()/L"onnxruntime.dll"; HMODULE h=LoadLibraryExW(path.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
         bool ep=h&&GetProcAddress(h,"OrtSessionOptionsAppendExecutionProvider_DML");
-        out<<(ep?L"[OK] ":backend==1?L"[FAIL] ":L"[WARN] ")<<L"ONNX Runtime DirectML execution-provider export"<<L"\r\n";
+        out<<(ep?L"[OK] ":backend==1?L"[FAIL] ":L"[WARN] ")<<L"ONNX Runtime DirectML execution-provider export"<<L"\r
+";
         if(!ep&&backend==1)ok=false;if(h)FreeLibrary(h);
     }
-    out<<L"\r\n"<<(ok?(backend==2?L"Overall status: READY for CPU inference.":backend==1?L"Overall status: READY for DirectML initialization.":L"Overall status: READY for automatic GPU/CPU selection."):L"Overall status: NOT READY. Analysis has been blocked to prevent a runtime crash.");
+    out<<L"\r
+"<<(ok?(backend==2?L"Overall status: READY for CPU inference.":backend==1?L"Overall status: READY for DirectML initialization.":L"Overall status: READY for automatic GPU/CPU selection."):L"Overall status: NOT READY. Analysis has been blocked to prevent a runtime crash.");
     if(interactive) MessageBoxW(hwnd_,out.str().c_str(),L"Runtime diagnostics",MB_OK|(ok?MB_ICONINFORMATION:MB_ICONERROR));
     if(!ok) setStatus(L"Runtime diagnostics failed. Click Runtime diagnostics for details.");
     return ok;
@@ -547,13 +562,24 @@ void App::analyse() {
                 const auto reportPath=exeDir()/L"Logs"/L"analysis_timings.log";
                 std::ofstream report(reportPath,std::ios::app);
                 if(report){SYSTEMTIME now{};GetLocalTime(&now);char when[40];snprintf(when,sizeof(when),"%04u-%02u-%02u %02u:%02u:%02u.%03u",now.wYear,now.wMonth,now.wDay,now.wHour,now.wMinute,now.wSecond,now.wMilliseconds);
-                    report<<"Analysis "<<when<<" | Image "<<input.width<<"x"<<input.height<<" | CPU "<<cpuChoice<<" ("<<threads<<" threads) | GPU "<<gpuChoice<<" | Actual "<<(analysis_.usedDirectML?"DirectML":"CPU")<<"\n";
-                    report<<"  Setup:       "<<fmt(analysis_.setupMs)<<"\n  Scene model: "<<fmt(analysis_.sceneMs)<<"\n  Clothing:    "<<fmt(analysis_.clothingMs)<<"\n  Face model:  "<<fmt(analysis_.faceMs)<<"\n  Masks:       "<<fmt(analysis_.masksMs)<<"\n  Refinement:  "<<fmt(analysis_.refinementMs)<<"\n  Total:       "<<fmt(analysis_.totalMs)<<" (worker wall "<<fmt(wallMs)<<")\n\n";
+                    report<<"Analysis "<<when<<" | Image "<<input.width<<"x"<<input.height<<" | CPU "<<cpuChoice<<" ("<<threads<<" threads) | GPU "<<gpuChoice<<" | Actual "<<(analysis_.usedDirectML?"DirectML":"CPU")<<"
+";
+                    report<<"  Setup:       "<<fmt(analysis_.setupMs)<<"
+  Scene model: "<<fmt(analysis_.sceneMs)<<"
+  Clothing:    "<<fmt(analysis_.clothingMs)<<"
+  Face model:  "<<fmt(analysis_.faceMs)<<"
+  Masks:       "<<fmt(analysis_.masksMs)<<"
+  Refinement:  "<<fmt(analysis_.refinementMs)<<"
+  Total:       "<<fmt(analysis_.totalMs)<<" (worker wall "<<fmt(wallMs)<<")
+
+";
                     report.flush();CrashLog::write("Analysis timing report appended: Logs/analysis_timings.log");
                 }else CrashLog::write("Could not open Logs/analysis_timings.log");
                 std::ofstream imageReport(exeDir()/L"Logs"/L"image_properties.log",std::ios::app);
-                if(imageReport){imageReport<<"Image "<<input.width<<"x"<<input.height<<"\n"
-                    <<analysis_.imageReport<<"\n";imageReport.flush();}
+                if(imageReport){imageReport<<"Image "<<input.width<<"x"<<input.height<<"
+"
+                    <<analysis_.imageReport<<"
+";imageReport.flush();}
                 std::ofstream measurements(exeDir()/L"Logs"/L"mask_measurements.csv",
                     std::ios::out|std::ios::trunc);
                 if(measurements){measurements<<analysis_.metricsCsv;measurements.flush();}
@@ -564,14 +590,17 @@ void App::analyse() {
             const double failedMs=std::chrono::duration<double,std::milli>(Clock::now()-analysisStart).count();
             const long long n=std::max(0LL,(long long)(failedMs+0.5));
             std::ofstream report(exeDir()/L"Logs"/L"analysis_timings.log",std::ios::app);
-            if(report){report<<"FAILED | CPU "<<cpuChoice<<" ("<<threads<<" threads) | GPU "<<gpuChoice<<" | Elapsed "<<n/60000<<":"<<std::setfill('0')<<std::setw(2)<<(n/1000)%60<<"."<<std::setw(3)<<n%1000<<" | "<<e.what()<<"\n\n";report.flush();}
+            if(report){report<<"FAILED | CPU "<<cpuChoice<<" ("<<threads<<" threads) | GPU "<<gpuChoice<<" | Elapsed "<<n/60000<<":"<<std::setfill('0')<<std::setw(2)<<(n/1000)%60<<"."<<std::setw(3)<<n%1000<<" | "<<e.what()<<"
+
+";report.flush();}
             analysis_.summary = std::string("ERROR:") + e.what();
         }
         if (!st.stop_requested()) PostMessageW(hwnd_, WM_ANALYSIS_DONE, 0, 0);
     });
 }
 
-void App::analysisDone() {\n    endOperation();
+void App::analysisDone() {
+    endOperation();
     analysing_ = false;
     EnableWindow(analyseBtn_, TRUE);
     TreeView_DeleteAllItems(maskList_);
@@ -835,7 +864,8 @@ void App::applyGuide(){
         const auto fingerprint=trainingImageSha256(image_);
         if(fingerprint.empty())throw std::runtime_error("Could not fingerprint loaded image");
         record<<"{\"schema\":2,\"label\":\""<<safeFileName(analysis_.masks[idx].name)<<"\",\"image_sha256\":\""<<fingerprint<<"\",\"image\":\""<<imagePath.filename().string()<<"\",\"prediction\":\""<<maskPath.filename().string()
-              <<"\",\"width\":"<<image_.width<<",\"height\":"<<image_.height<<",\"area\":["<<r.left<<","<<r.top<<","<<r.right<<","<<r.bottom<<"],\"rotation_degrees\":"<<std::setprecision(10)<<(guideAngles_[idx]*180/pi)<<",\"rotation_origin\":["<<(r.left+r.right)*.5<<","<<(r.top+r.bottom)*.5<<"],\"annotation\":\"rough_bounds_only\",\"pixels_inside_verified\":false}\n";
+              <<"\",\"width\":"<<image_.width<<",\"height\":"<<image_.height<<",\"area\":["<<r.left<<","<<r.top<<","<<r.right<<","<<r.bottom<<"],\"rotation_degrees\":"<<std::setprecision(10)<<(guideAngles_[idx]*180/pi)<<",\"rotation_origin\":["<<(r.left+r.right)*.5<<","<<(r.top+r.bottom)*.5<<"],\"annotation\":\"rough_bounds_only\",\"pixels_inside_verified\":false}
+";
         if(!record)throw std::runtime_error("Could not complete area metadata");
         for(int y=0;y<mask.height;++y)for(int x=0;x<mask.width;++x)if(mask.pixels[size_t(y)*mask.width+x]&&!withinGuide(r,guideAngles_[idx],x+.5,y+.5))mask.pixels[size_t(y)*mask.width+x]=0;
         guideEdited_[idx]=false;showRaw_=false;SendMessageW(refinedView_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(rawView_,BM_SETCHECK,BST_UNCHECKED,0);
@@ -857,7 +887,8 @@ void App::paintMask(POINT p,int index,int value){
     SendMessageW(rawView_,BM_SETCHECK,BST_UNCHECKED,0);
 }
 
-void App::createMissingMask(){\n    beginOperation(L"Creating missing mask...",-1);
+void App::createMissingMask(){
+    beginOperation(L"Creating missing mask...",-1);
     if(analysing_||image_.empty()){setStatus(L"Analyse an image before creating a missing mask.");return;}
     HTREEITEM item=TreeView_GetSelection(maskList_);
     if(!item){setStatus(L"Select a missing part marked (no detector) in the list first.");return;}
@@ -1003,7 +1034,8 @@ void App::exportAll() {
         if(!MoveFileExW(pendingZip.c_str(),zipPath.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
             throw std::runtime_error("Could not finish export ZIP");
         std::filesystem::remove_all(stage,ignored);
-        endOperation();\n        setStatus(L"Exported current image to " + zipPath.wstring() + L" using maximum ZIP compression; all mask files are contained inside the archive.");
+        endOperation();
+        setStatus(L"Exported current image to " + zipPath.wstring() + L" using maximum ZIP compression; all mask files are contained inside the archive.");
     } catch (const std::exception& e) { showError(L"Export failed", widen(e.what())); }
 }
 
@@ -1033,7 +1065,8 @@ void App::exportPoseGifs(){
         if(!GetSaveFileNameW(&dialog))return;
         chosen=filename;
     }
-    beginOperation(L"Generating 30-second pose GIF...",-1);\n    EnableWindow(poseGifBtn_,FALSE);
+    beginOperation(L"Generating 30-second pose GIF...",-1);
+    EnableWindow(poseGifBtn_,FALSE);
     SetCursor(LoadCursor(nullptr,IDC_WAIT));
     size_t completed=0,approximate=0;std::string errors;
     for(const auto& subject:subjects){
