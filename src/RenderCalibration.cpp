@@ -56,7 +56,24 @@ const std::vector<CalibrationBackendInfo>& calibrationBackends(){
         {CalibrationBackend::OpenGLES,L"OpenGL ES",false,true},
         {CalibrationBackend::WebGPU,L"WebGPU",false,true},
         {CalibrationBackend::WebGL2,L"WebGL 2",false,true},
-        {CalibrationBackend::WebGL1,L"WebGL 1",false,true}
+        {CalibrationBackend::WebGL1,L"WebGL 1",false,true},
+        {CalibrationBackend::Ps2Gs,L"PlayStation 2 / PSX - GS",false,true},
+        {CalibrationBackend::Ps3Rsx,L"PlayStation 3 - RSX",false,true},
+        {CalibrationBackend::Ps4Gnm,L"PlayStation 4 - GNM/GNMX",false,true},
+        {CalibrationBackend::Ps5Gnm,L"PlayStation 5 - GNM",false,true},
+        {CalibrationBackend::DreamcastPvr,L"Dreamcast - PowerVR/PVR",false,true},
+        {CalibrationBackend::GameCubeGx,L"GameCube - GX",false,true},
+        {CalibrationBackend::WiiGx,L"Wii - GX",false,true},
+        {CalibrationBackend::WiiUGx2,L"Wii U - GX2",false,true},
+        {CalibrationBackend::SwitchNvn,L"Nintendo Switch - NVN",false,true},
+        {CalibrationBackend::SwitchVulkan,L"Nintendo Switch - Vulkan",false,true},
+        {CalibrationBackend::XboxD3D8,L"Xbox - Direct3D 8 family",false,true},
+        {CalibrationBackend::Xbox360D3D9,L"Xbox 360 - Direct3D 9 family",false,true},
+        {CalibrationBackend::XboxOneD3D11,L"Xbox One - Direct3D 11 family",false,true},
+        {CalibrationBackend::XboxSeriesD3D12,L"Xbox Series - Direct3D 12 family",false,true},
+        {CalibrationBackend::PspGu,L"PSP - GU",false,true},
+        {CalibrationBackend::NvidiaShieldOpenGLES,L"NVIDIA SHIELD - OpenGL ES",false,true},
+        {CalibrationBackend::NvidiaShieldVulkan,L"NVIDIA SHIELD - Vulkan",false,true}
     };
     return b;
 }
