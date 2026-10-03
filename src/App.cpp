@@ -23,7 +23,7 @@
 #include <array>
 #include <chrono>
 #include <windowsx.h>
-#include <cmath>
+#include <cmath>\n#include <pdh.h>
 
 namespace {
 constexpr double pi=3.14159265358979323846;
@@ -50,6 +50,48 @@ std::wstring utf8ToWide(const std::string& s) {
     std::wstring w(n, 0);
     MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), w.data(), n);
     return w;
+}
+
+// Windows exposes GPU engine utilisation through the GPU Engine performance
+// counter provider. Sum engines for the Vulkan adapter, but cap at 100% so
+// this remains an adapter utilisation figure rather than an engine-count sum.
+int queryGpuUtilisation(const std::wstring& gpuName) {
+    PDH_HQUERY query{};
+    PDH_HCOUNTER counter{};
+    if (PdhOpenQueryW(nullptr, 0, &query) != ERROR_SUCCESS) return -1;
+    const wchar_t* path = L"\\\\GPU Engine(*)\\Utilization Percentage";
+    if (PdhAddEnglishCounterW(query, path, 0, &counter) != ERROR_SUCCESS) {
+        PdhCloseQuery(query);
+        return -1;
+    }
+    if (PdhCollectQueryData(query) != ERROR_SUCCESS) {
+        PdhCloseQuery(query);
+        return -1;
+    }
+    Sleep(100);
+    if (PdhCollectQueryData(query) != ERROR_SUCCESS) {
+        PdhCloseQuery(query);
+        return -1;
+    }
+    DWORD size=0,count=0;
+    PDH_STATUS s=PdhGetFormattedCounterArrayW(counter,PDH_FMT_DOUBLE,&size,&count,nullptr);
+    if(s!=PDH_MORE_DATA || !size){PdhCloseQuery(query);return -1;}
+    std::vector<unsigned char> storage(size);
+    auto* items=reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W*>(storage.data());
+    if(PdhGetFormattedCounterArrayW(counter,PDH_FMT_DOUBLE,&size,&count,items)!=ERROR_SUCCESS){
+        PdhCloseQuery(query);return -1;
+    }
+    double total=0.0;
+    // GPU Engine instance names do not reliably carry the friendly Vulkan
+    // adapter name, so use the system GPU-engine aggregate. On the common
+    // single-adapter case this is the selected Vulkan GPU's activity.
+    for(DWORD i=0;i<count;++i)
+        if(items[i].FmtValue.CStatus==PDH_CSTATUS_VALID_DATA ||
+           items[i].FmtValue.CStatus==PDH_CSTATUS_NEW_DATA)
+            total += std::max(0.0,items[i].FmtValue.doubleValue);
+    PdhCloseQuery(query);
+    (void)gpuName;
+    return static_cast<int>(std::clamp(total,0.0,100.0)+0.5);
 }
 
 
@@ -417,6 +459,16 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     SetWindowTextW(cpuUsageText_,(L"CPU utilisation (all logical processors): "+std::to_wstring(usage)+L"%").c_str());
                 }
                 prevIdle=idle;prevKernel=kernel;prevUser=user;
+            }
+
+            // GPU utilisation is sampled independently from CPU utilisation.
+            // Never infer GPU load from CPU load.
+            if(vulkanReady_){
+                const int gpuUsage=queryGpuUtilisation(utf8ToWide(renderer_.gpuName()));
+                SetWindowTextW(gpuUsageText_,
+                    gpuUsage>=0
+                        ? (L"GPU utilisation: "+std::to_wstring(gpuUsage)+L"%").c_str()
+                        : L"GPU utilisation: unavailable");
             }
         }
         return 0;
