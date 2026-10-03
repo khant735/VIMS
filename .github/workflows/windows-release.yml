@@ -113,6 +113,14 @@ jobs:
           "RELEASE_ZIP=$zip" >> $env:GITHUB_ENV
           "RELEASE_CRC32=$crc32" >> $env:GITHUB_ENV
 
+      - name: Upload executable-only artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: VIMS-${{ github.ref_type == 'tag' && github.ref_name || 'development' }}-Windows-x64-EXE
+          path: build/Release/VulkanImageMaskStudio.exe
+          if-no-files-found: error
+          compression-level: 0
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v6
         with:
