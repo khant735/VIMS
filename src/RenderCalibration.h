@@ -48,7 +48,9 @@ enum class CalibrationBackend {
     PsVitaGxm,
     PsTvGxm,
     NvidiaShieldOpenGLES,
-    NvidiaShieldVulkan
+    NvidiaShieldVulkan,
+    AppleMetal,
+    AppleVulkanMoltenVK
 };
 struct CalibrationBackendInfo {
     CalibrationBackend backend;
@@ -56,5 +58,6 @@ struct CalibrationBackendInfo {
     bool nativeWindows;
     bool browserOrMobile;
     bool internetEligible;
+    bool theoreticalProbeOnly;
 };
 const std::vector<CalibrationBackendInfo>& calibrationBackends();
