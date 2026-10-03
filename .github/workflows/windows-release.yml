@@ -59,6 +59,16 @@ jobs:
           if (-not $dll) { throw 'x64 DirectML.dll not found in Microsoft.AI.DirectML 1.15.4 package' }
           "DIRECTML_DLL=$($dll.FullName)" >> $env:GITHUB_ENV
 
+      - name: Compile render-test shaders
+        shell: pwsh
+        run: |
+          $glslc = 'C:\VulkanSDK\1.4.357.0\Bin\glslc.exe'
+          if (-not (Test-Path $glslc)) { throw 'Vulkan glslc compiler missing' }
+          & $glslc src\cog.vert -o src\cog.vert.spv
+          if ($LASTEXITCODE -ne 0) { throw 'cog.vert shader compilation failed' }
+          & $glslc src\cog.frag -o src\cog.frag.spv
+          if ($LASTEXITCODE -ne 0) { throw 'cog.frag shader compilation failed' }
+
       - name: Build
         shell: pwsh
         run: .\build.ps1
