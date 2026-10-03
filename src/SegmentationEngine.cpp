@@ -200,8 +200,13 @@ static std::vector<std::pair<std::string,Mask>> deriveFaceParts(const ImageRGBA&
  part("Human > Head > Face > Left Eyebrow",.56,.96,.05,.21,0);
  part("Human > Head > Face > Right Eye",.17,.55,.16,.29,1);
  part("Human > Head > Face > Left Eye",.55,.96,.18,.31,1);
- part("Human > Head > Face > Nose",.34,.75,.25,.41,2);
- part("Human > Head > Face > Mouth",.17,.88,.38,.55,3);
+ // The nasal bridge begins between/below the brows and runs to the nasal tip.
+ // Keep the parent Nose mask, but publish a narrower bridge/root prior separately so
+ // eyelid pixels cannot become the app's only interpretation of "nose".
+ part("Human > Head > Face > Nose",.39,.68,.20,.52,2);
+ part("Human > Head > Face > Nose > Bridge",.43,.64,.18,.39,2);
+ part("Human > Head > Face > Nose > Tip",.39,.69,.36,.50,2);
+ part("Human > Head > Face > Mouth",.17,.88,.50,.68,3);
  // Side protrusions belong to the head. Require colour close to the face and
  // visible pixels outside its boundary, avoiding invented ears on plain photos.
  auto ear=[&](const char* name,bool viewerLeft){
