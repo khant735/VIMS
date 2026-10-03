@@ -226,7 +226,7 @@ void App::createUi() {
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_CREATE_PART),instance_,nullptr);
     approveBtn_=CreateWindowW(L"BUTTON",L"Approve mask for learning",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_APPROVE_MASK),instance_,nullptr);
-    status_ = CreateWindowW(L"STATIC", L"Open an image to begin.", WS_CHILD | WS_VISIBLE | SS_LEFT,0,0,100,60, panelContent_, nullptr, instance_, nullptr);
+    status_ = CreateWindowW(L"STATIC", L"", WS_CHILD | SS_LEFT,0,0,0,0, panelContent_, nullptr, instance_, nullptr);
     faceModelBtn_=CreateWindowW(L"BUTTON",L"Download Core + Face AI Models",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,100,30,panelContent_,(HMENU)IDC_FACE_MODEL,instance_,nullptr);
     faceModelStatus_=CreateWindowW(L"STATIC",L"",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,100,22,panelContent_,nullptr,instance_,nullptr);
     updateFaceModelStatus();
@@ -446,7 +446,20 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
         }
         return 0;
     case WM_ANALYSIS_DONE: analysisDone(); return 0;
+    case WM_ANALYSIS_PROGRESS:
+        analysisProgress_=std::clamp<int>(static_cast<int>(w),0,99);
+        updateOperation(L"Analysing image... ("+std::to_wstring(analysisProgress_)+L"%)",analysisProgress_);
+        return 0;
     case WM_FACE_MODEL_DONE: faceModelDone(w != 0); return 0;
+    case WM_TIMER:
+        if(w==2 && analysing_){
+            // ONNX Runtime does not expose per-inference percentage callbacks.
+            // Advance only to 90% while the worker is active; completion sets 100%.
+            const int next=std::min(90,analysisProgress_ + (analysisProgress_<20?4:analysisProgress_<60?2:1));
+            if(next!=analysisProgress_) PostMessageW(hwnd_,WM_ANALYSIS_PROGRESS,next,0);
+            return 0;
+        }
+        break;
     case WM_CLOSE:
         if (analysing_) worker_.request_stop();
         DestroyWindow(hwnd_); return 0;
@@ -486,15 +499,7 @@ void App::updateOperation(const std::wstring& label,int percent){
 }
 void App::endOperation(){
     SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);
-    SendMessageW(operationProgress_,PBM_SETPOS,100,0);
-    wchar_t current[256]{};
-    GetWindowTextW(operationLabel_,current,256);
-    std::wstring completed=current;
-    while(!completed.empty() && (completed.back()==L'.' || completed.back()==L' ')) completed.pop_back();
-    if(completed.empty()) completed=L"Operation";
-    completed += L" - Completed";
-    SetWindowTextW(operationLabel_,completed.c_str());
-    InvalidateRect(operationLabel_,nullptr,TRUE);UpdateWindow(operationLabel_);
+    SendMessageW(operationProgress_,PBM_SETPOS,0,0);
     InvalidateRect(operationProgress_,nullptr,TRUE);UpdateWindow(operationProgress_);
 }
 void App::showError(const std::wstring& title, const std::wstring& message) { MessageBoxW(hwnd_, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR); }
@@ -597,8 +602,10 @@ void App::analyse() {
     EnableWindow(analyseBtn_, FALSE);
     setStatus(backend==2?L"Analysing on CPU...":backend==1?L"Analysing with DirectML...":L"Analysing with automatic device selection...");
 
-    beginOperation(L"Analysing image...",-1);
-    setStatus(L"Running segmentation and refinement. ONNX inference stages without progress callbacks use an activity bar.");
+    analysisProgress_=0;
+    beginOperation(L"Analysing image... (0%)",0);
+    setStatus(L"Running segmentation and refinement...");
+    SetTimer(hwnd_,2,500,nullptr);
     ImageRGBA input = image_;
     const std::string cpuChoice=sel==1?"Physical cores (SMT off)":sel==2?"SMT 25%":sel==3?"SMT 50%":sel==4?"SMT 75%":sel==5?"SMT 100%":"Auto CPU threads";
     const std::string gpuChoice=backend==1?"DirectML required":backend==2?"CPU only":"Auto";
@@ -644,7 +651,9 @@ void App::analyse() {
 }
 
 void App::analysisDone() {
-    endOperation();
+    KillTimer(hwnd_,2);
+    analysisProgress_=100;
+    updateOperation(L"Analysing image... (100%)",100);
     analysing_ = false;
     EnableWindow(analyseBtn_, TRUE);
     TreeView_DeleteAllItems(maskList_);
@@ -704,6 +713,7 @@ int App::selectedMask() const {
 
 namespace {
 double cubic(double x){x=std::abs(x);if(x<1)return 1.5*x*x*x-2.5*x*x+1;if(x<2)return -.5*x*x*x+2.5*x*x-4*x+2;return 0;}
+    endOperation();
 }
 void App::updatePreview() {
     if(image_.empty()||!vulkanReady_)return;
