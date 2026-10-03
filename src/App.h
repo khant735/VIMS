@@ -25,7 +25,9 @@ private:
     POINT panStart_{};
     double panOriginX_=0,panOriginY_=0;
     HWND cpuText_{};
+    HWND cpuUsageText_{};
     HWND gpuText_{};
+    HWND gpuUsageText_{};
     HWND operationLabel_{}, operationProgress_{};
     HWND cpuCombo_{};
     HWND backendCombo_{};
