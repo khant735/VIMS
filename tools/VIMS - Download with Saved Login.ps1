@@ -2,6 +2,14 @@ $gh = "C:\Program Files\GitHub CLI\gh.exe"
 
 & $gh auth status
 
-& $gh run download `
-    --repo khant735/VIMS `
-    --name VIMS-development-Windows-x64-EXE
+# Download the EXE-only artifact from the newest successful workflow run.
+# Its CRC32 suffix changes on every build, so discover the exact artifact name first.
+$runId = (& $gh run list --repo khant735/VIMS --workflow windows-release.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId').Trim()
+if (-not $runId) { throw "No successful VIMS Windows workflow run was found." }
+
+$artifactName = (& $gh api "repos/khant735/VIMS/actions/runs/$runId/artifacts" --jq '.artifacts[].name | select(startswith("VIMS-development-Windows-x64-EXE-"))' | Select-Object -First 1).Trim()
+if (-not $artifactName) { throw "No CRC32-named VIMS EXE artifact was found in workflow run $runId." }
+
+Write-Host "Downloading $artifactName from workflow run $runId..."
+& $gh run download $runId --repo khant735/VIMS --name $artifactName
+if ($LASTEXITCODE -ne 0) { throw "GitHub CLI download failed with exit code $LASTEXITCODE." }
