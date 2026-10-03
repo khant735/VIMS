@@ -81,3 +81,30 @@ const std::vector<CalibrationBackendInfo>& calibrationBackends(){
     };
     return b;
 }
+
+const wchar_t* calibrationResultName(CalibrationResultKind k){
+    switch(k){
+    case CalibrationResultKind::RenderPass:return L"RENDER PASS";
+    case CalibrationResultKind::RenderFail:return L"RENDER FAIL";
+    case CalibrationResultKind::TheoreticalCompatible:return L"THEORETICALLY COMPATIBLE";
+    case CalibrationResultKind::TranslationRequired:return L"TRANSLATION REQUIRED";
+    case CalibrationResultKind::TheoreticalIncompatible:return L"THEORETICALLY INCOMPATIBLE";
+    default:return L"UNAVAILABLE";
+    }
+}
+std::vector<CalibrationResult> theoreticalCalibrationResults(){
+    std::vector<CalibrationResult> out;
+    for(const auto& b:calibrationBackends()){
+        if(!b.theoreticalProbeOnly) continue;
+        CalibrationResultKind k=CalibrationResultKind::TheoreticalCompatible;
+        const wchar_t* d=L"Shared two-gear scene can be expressed for this target; real hardware execution is not performed by the Windows build.";
+        if(b.backend==CalibrationBackend::AppleVulkanMoltenVK){
+            k=CalibrationResultKind::TranslationRequired;
+            d=L"Vulkan path requires MoltenVK translation to Metal; Windows calibration cannot prove Apple hardware execution.";
+        } else if(b.backend==CalibrationBackend::AppleMetal){
+            d=L"Scene is suitable for a native Metal implementation; Windows calibration does not execute Metal.";
+        }
+        out.push_back({b.backend,k,d});
+    }
+    return out;
+}
