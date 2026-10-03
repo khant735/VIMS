@@ -10,6 +10,17 @@ static void vkCheck(VkResult r, const char* what) {
 
 VulkanRenderer::~VulkanRenderer() { shutdown(); }
 
+bool VulkanRenderer::gpuLuid(LUID& luid) const {
+    if (!physical_) return false;
+    VkPhysicalDeviceIDProperties id{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES};
+    VkPhysicalDeviceProperties2 props{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+    props.pNext = &id;
+    vkGetPhysicalDeviceProperties2(physical_, &props);
+    if (!id.deviceLUIDValid) return false;
+    std::memcpy(&luid, id.deviceLUID, sizeof(LUID));
+    return true;
+}
+
 void VulkanRenderer::initialize(HWND hwnd) {
     hwnd_ = hwnd;
     createInstance();
