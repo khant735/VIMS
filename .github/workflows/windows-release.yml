@@ -103,7 +103,7 @@ jobs:
           } finally { $stream.Dispose() }
           $crc = [uint32]($crc -bxor 0xFFFFFFFFL)
           $crc32 = $crc.ToString('X8')
-          $zip = "VIMS-$version-Windows-x64-CRC32-$crc32.zip"
+          $zip = "VIMS-$version-Windows-x64-$crc32.zip"
           Move-Item -LiteralPath $baseZip -Destination $zip
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $zip" | Set-Content "$zip.sha256" -Encoding ascii
@@ -114,7 +114,7 @@ jobs:
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v6
         with:
-          name: VIMS-${{ github.ref_type == 'tag' && github.ref_name || 'development' }}-Windows-x64-CRC32-${{ env.RELEASE_CRC32 }}
+          name: VIMS-${{ github.ref_type == 'tag' && github.ref_name || 'development' }}-Windows-x64-${{ env.RELEASE_CRC32 }}
           path: |
             ${{ env.RELEASE_ZIP }}
             ${{ env.RELEASE_ZIP }}.sha256
