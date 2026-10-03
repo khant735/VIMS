@@ -44,9 +44,38 @@ jobs:
           $root = (Resolve-Path 'deps\onnxruntime-win-x64-1.30.0').Path
           "ONNXRUNTIME_ROOT=$root" >> $env:GITHUB_ENV
 
+      - name: Install DirectML
+        shell: pwsh
+        run: |
+          $url = 'https://www.nuget.org/api/v2/package/Microsoft.AI.DirectML/1.15.4'
+          Invoke-WebRequest $url -OutFile directml.nupkg
+          Copy-Item directml.nupkg directml.zip
+          Expand-Archive directml.zip -DestinationPath deps\directml
+          $dll = Get-ChildItem deps\directml -Recurse -Filter DirectML.dll |
+            Where-Object { $_.FullName -match 'win-x64|x64' } |
+            Select-Object -First 1
+          if (-not $dll) { throw 'x64 DirectML.dll not found in Microsoft.AI.DirectML 1.15.4 package' }
+          "DIRECTML_DLL=$($dll.FullName)" >> $env:GITHUB_ENV
+
       - name: Build
         shell: pwsh
         run: .\build.ps1
+
+      - name: Validate runtime files
+        shell: pwsh
+        run: |
+          $out = 'build\Release'
+          Copy-Item $env:DIRECTML_DLL $out -Force
+          $required = @(
+            "$out\VulkanImageMaskStudio.exe",
+            "$out\libc++.dll",
+            "$out\libunwind.dll",
+            "$out\onnxruntime.dll",
+            "$out\DirectML.dll"
+          )
+          foreach ($file in $required) {
+            if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Required release file missing: $file" }
+          }
 
       - name: Package
         shell: pwsh
