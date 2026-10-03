@@ -161,8 +161,16 @@ void App::createUi() {
     zoomOutBtn_=CreateWindowW(L"BUTTON",L"-",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,34,28,hwnd_,(HMENU)IDC_ZOOM_OUT,instance_,nullptr);
     zoomFitBtn_=CreateWindowW(L"BUTTON",L"Fit image",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,90,28,hwnd_,(HMENU)IDC_ZOOM_FIT,instance_,nullptr);
     zoomInBtn_=CreateWindowW(L"BUTTON",L"+",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,34,28,hwnd_,(HMENU)IDC_ZOOM_IN,instance_,nullptr);
-    cpuText_ = CreateWindowW(L"STATIC", cpu_.description().c_str(), WS_CHILD | WS_VISIBLE,
+    cpuText_ = CreateWindowW(L"STATIC", (L"CPU: " + cpu_.description()).c_str(), WS_CHILD | WS_VISIBLE,
         0,0,100,20, panelContent_, nullptr, instance_, nullptr);
+    gpuText_ = CreateWindowW(L"STATIC", L"GPU: initialising Vulkan...", WS_CHILD | WS_VISIBLE,
+        0,0,100,20, panelContent_, nullptr, instance_, nullptr);
+    operationLabel_ = CreateWindowW(L"STATIC", L"Ready", WS_CHILD | WS_VISIBLE | SS_LEFT,
+        0,0,100,20,panelContent_,nullptr,instance_,nullptr);
+    operationProgress_ = CreateWindowExW(0,PROGRESS_CLASSW,nullptr,WS_CHILD|WS_VISIBLE|PBS_SMOOTH,
+        0,0,100,18,panelContent_,nullptr,instance_,nullptr);
+    SendMessageW(operationProgress_,PBM_SETRANGE,0,MAKELPARAM(0,100));
+    SendMessageW(operationProgress_,PBM_SETPOS,0,0);
     cpuCombo_ = CreateWindowW(L"COMBOBOX", nullptr, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
         0,0,100,200, panelContent_, reinterpret_cast<HMENU>(IDC_CPUCOMBO), instance_, nullptr);
     SendMessageW(cpuCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Auto CPU threads"));
@@ -280,7 +288,7 @@ void App::layout() {
     int x=pad,y=pad,w=available;
     const int row=S(24), btn=S(30), labelW=std::clamp(int(w*.48),S(175),S(245));
 
-    place(cpuText_,x,y,w,S(36)); y+=S(38);
+    place(cpuText_,x,y,w,S(24)); y+=S(26);\n    place(gpuText_,x,y,w,S(24)); y+=S(26);\n    place(operationLabel_,x,y,w,S(20)); y+=S(21);\n    place(operationProgress_,x,y,w,S(18)); y+=S(24);
     place(cpuCombo_,x,y,w,S(200)); y+=S(30);
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
     place(openBtn_,x,y,(w-gap)/2,btn);
@@ -419,6 +427,14 @@ void App::updateRefinementLabels(){wchar_t b[80];swprintf(b,80,L"Boundary Precis
 void App::resetRefinementControls(){SendMessageW(refineEnable_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(boundarySlider_,TBM_SETPOS,TRUE,70);SendMessageW(materialSlider_,TBM_SETPOS,TRUE,65);SendMessageW(colourSlider_,TBM_SETPOS,TRUE,55);SendMessageW(radiusSlider_,TBM_SETPOS,TRUE,8);SendMessageW(fillHoles_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(removeIslands_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(protectSkin_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(refinedView_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(rawView_,BM_SETCHECK,BST_UNCHECKED,0);showRaw_=false;updateRefinementLabels();}
 
 void App::setStatus(const std::wstring& s) { SetWindowTextW(status_, s.c_str()); }
+void App::beginOperation(const std::wstring& label,int percent){
+    SetWindowTextW(operationLabel_,label.c_str());
+    LONG style=GetWindowLongW(operationProgress_,GWL_STYLE);
+    if(percent<0){SetWindowLongW(operationProgress_,GWL_STYLE,style|PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETMARQUEE,TRUE,35);}
+    else{SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);SetWindowLongW(operationProgress_,GWL_STYLE,style&~PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);}
+}
+void App::updateOperation(const std::wstring& label,int percent){SetWindowTextW(operationLabel_,label.c_str());if(percent>=0)SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);}
+void App::endOperation(){SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);LONG style=GetWindowLongW(operationProgress_,GWL_STYLE);SetWindowLongW(operationProgress_,GWL_STYLE,style&~PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETPOS,0,0);SetWindowTextW(operationLabel_,L"Ready");}
 void App::showError(const std::wstring& title, const std::wstring& message) { MessageBoxW(hwnd_, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR); }
 
 void App::openImage() {
@@ -555,7 +571,7 @@ void App::analyse() {
     });
 }
 
-void App::analysisDone() {
+void App::analysisDone() {\n    endOperation();
     analysing_ = false;
     EnableWindow(analyseBtn_, TRUE);
     TreeView_DeleteAllItems(maskList_);
@@ -841,7 +857,7 @@ void App::paintMask(POINT p,int index,int value){
     SendMessageW(rawView_,BM_SETCHECK,BST_UNCHECKED,0);
 }
 
-void App::createMissingMask(){
+void App::createMissingMask(){\n    beginOperation(L"Creating missing mask...",-1);
     if(analysing_||image_.empty()){setStatus(L"Analyse an image before creating a missing mask.");return;}
     HTREEITEM item=TreeView_GetSelection(maskList_);
     if(!item){setStatus(L"Select a missing part marked (no detector) in the list first.");return;}
@@ -873,7 +889,7 @@ void App::createMissingMask(){
     SetWindowTextW(guideBtn_,L"Edit mask area");
     TreeView_SetItem(maskList_,&selected);
     guideMode_=true;SendMessageW(guideBtn_,BM_SETCHECK,BST_CHECKED,0);
-    updatePreview();setStatus(L"Blank mask created. Shift+drag adds pixels, Ctrl+drag erases; mouse wheel adjusts brush. Approve after correction.");
+    updatePreview();endOperation();setStatus(L"Blank mask created. Shift+drag adds pixels, Ctrl+drag erases; mouse wheel adjusts brush. Approve after correction.");
 }
 
 void App::approveMask(){
@@ -987,7 +1003,7 @@ void App::exportAll() {
         if(!MoveFileExW(pendingZip.c_str(),zipPath.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
             throw std::runtime_error("Could not finish export ZIP");
         std::filesystem::remove_all(stage,ignored);
-        setStatus(L"Exported current image to " + zipPath.wstring() + L" using maximum ZIP compression; all mask files are contained inside the archive.");
+        endOperation();\n        setStatus(L"Exported current image to " + zipPath.wstring() + L" using maximum ZIP compression; all mask files are contained inside the archive.");
     } catch (const std::exception& e) { showError(L"Export failed", widen(e.what())); }
 }
 
@@ -1017,7 +1033,7 @@ void App::exportPoseGifs(){
         if(!GetSaveFileNameW(&dialog))return;
         chosen=filename;
     }
-    EnableWindow(poseGifBtn_,FALSE);
+    beginOperation(L"Generating 30-second pose GIF...",-1);\n    EnableWindow(poseGifBtn_,FALSE);
     SetCursor(LoadCursor(nullptr,IDC_WAIT));
     size_t completed=0,approximate=0;std::string errors;
     for(const auto& subject:subjects){
@@ -1037,7 +1053,7 @@ void App::exportPoseGifs(){
             if(!errors.empty())errors+="; ";errors+=subject+": "+e.what();
         }
     }
-    SetCursor(LoadCursor(nullptr,IDC_ARROW));EnableWindow(poseGifBtn_,TRUE);
+    SetCursor(LoadCursor(nullptr,IDC_ARROW));EnableWindow(poseGifBtn_,TRUE);endOperation();
     if(!errors.empty())showError(L"Pose GIF export",widen(errors));
     if(completed)setStatus(L"Saved "+std::to_wstring(completed)+L" transparent 1280 x 720, 30-second GIF(s) to "+(chosen.empty()?folder.wstring():chosen.wstring())+L". " +
         (approximate?std::to_wstring(approximate)+L" used approximate limb motion.":L""));
