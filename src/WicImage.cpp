@@ -17,7 +17,7 @@ void saveCutoutPngWic(const std::filesystem::path& p,const ImageRGBA& image,cons
  std::vector<BYTE> bgra(count*4);
  for(size_t i=0;i<count;++i){
   const size_t j=i*4;
-  bgra[j]=image.pixels[j+2]; bgra[j+1]=image.pixels[j+1]; bgra[j+2]=image.pixels[j];
+  bgra[j]=image.pixels[j]; bgra[j+1]=image.pixels[j+1]; bgra[j+2]=image.pixels[j+2];
   bgra[j+3]=static_cast<BYTE>((unsigned(image.pixels[j+3])*unsigned(mask.pixels[i])+127)/255);
  }
  CoInitializeEx(nullptr,COINIT_MULTITHREADED);
@@ -41,9 +41,9 @@ void saveCutoutPngWic(const std::filesystem::path& p,const ImageRGBA& image,cons
   ck(encoder->CreateNewFrame(&frame,&bag),"PNG frame failed");
   ck(frame->Initialize(bag),"PNG frame init failed");
   ck(frame->SetSize(image.width,image.height),"PNG dimensions failed");
-  WICPixelFormatGUID fmt=GUID_WICPixelFormat32bppBGRA;
-  ck(frame->SetPixelFormat(&fmt),"PNG BGRA format failed");
-  if(!IsEqualGUID(fmt,GUID_WICPixelFormat32bppBGRA)) throw std::runtime_error("PNG encoder cannot preserve transparency");
+  WICPixelFormatGUID fmt=GUID_WICPixelFormat32bppRGBA;
+  ck(frame->SetPixelFormat(&fmt),"PNG RGBA format failed");
+  if(!IsEqualGUID(fmt,GUID_WICPixelFormat32bppRGBA)) throw std::runtime_error("PNG encoder cannot preserve RGBA transparency");
   ck(frame->WritePixels(image.height,image.width*4,static_cast<UINT>(bgra.size()),bgra.data()),"Cutout PNG write failed");
   ck(frame->Commit(),"Cutout PNG frame commit failed");
   ck(encoder->Commit(),"Cutout PNG commit failed");
