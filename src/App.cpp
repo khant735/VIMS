@@ -553,24 +553,18 @@ void App::analyse() {
                 const auto reportPath=exeDir()/L"Logs"/L"analysis_timings.log";
                 std::ofstream report(reportPath,std::ios::app);
                 if(report){SYSTEMTIME now{};GetLocalTime(&now);char when[40];snprintf(when,sizeof(when),"%04u-%02u-%02u %02u:%02u:%02u.%03u",now.wYear,now.wMonth,now.wDay,now.wHour,now.wMinute,now.wSecond,now.wMilliseconds);
-                    report<<"Analysis "<<when<<" | Image "<<input.width<<"x"<<input.height<<" | CPU "<<cpuChoice<<" ("<<threads<<" threads) | GPU "<<gpuChoice<<" | Actual "<<(analysis_.usedDirectML?"DirectML":"CPU")<<"
-";
-                    report<<"  Setup:       "<<fmt(analysis_.setupMs)<<"
-  Scene model: "<<fmt(analysis_.sceneMs)<<"
-  Clothing:    "<<fmt(analysis_.clothingMs)<<"
-  Face model:  "<<fmt(analysis_.faceMs)<<"
-  Masks:       "<<fmt(analysis_.masksMs)<<"
-  Refinement:  "<<fmt(analysis_.refinementMs)<<"
-  Total:       "<<fmt(analysis_.totalMs)<<" (worker wall "<<fmt(wallMs)<<")
-
-";
+                    report<<"Analysis "<<when<<" | Image "<<input.width<<"x"<<input.height<<" | CPU "<<cpuChoice<<" ("<<threads<<" threads) | GPU "<<gpuChoice<<" | Actual "<<(analysis_.usedDirectML?"DirectML":"CPU")<<"\n";
+                    report<<"  Setup:       "<<fmt(analysis_.setupMs)<<"\n"
+                          <<"  Scene model: "<<fmt(analysis_.sceneMs)<<"\n"
+                          <<"  Clothing:    "<<fmt(analysis_.clothingMs)<<"\n"
+                          <<"  Face model:  "<<fmt(analysis_.faceMs)<<"\n"
+                          <<"  Masks:       "<<fmt(analysis_.masksMs)<<"\n"
+                          <<"  Refinement:  "<<fmt(analysis_.refinementMs)<<"\n"
+                          <<"  Total:       "<<fmt(analysis_.totalMs)<<" (worker wall "<<fmt(wallMs)<<")\n\n";
                     report.flush();CrashLog::write("Analysis timing report appended: Logs/analysis_timings.log");
                 }else CrashLog::write("Could not open Logs/analysis_timings.log");
                 std::ofstream imageReport(exeDir()/L"Logs"/L"image_properties.log",std::ios::app);
-                if(imageReport){imageReport<<"Image "<<input.width<<"x"<<input.height<<"
-"
-                    <<analysis_.imageReport<<"
-";imageReport.flush();}
+                if(imageReport){imageReport<<"Image "<<input.width<<"x"<<input.height<<"\n"<<analysis_.imageReport<<"\n";imageReport.flush();}
                 std::ofstream measurements(exeDir()/L"Logs"/L"mask_measurements.csv",
                     std::ios::out|std::ios::trunc);
                 if(measurements){measurements<<analysis_.metricsCsv;measurements.flush();}
@@ -581,9 +575,7 @@ void App::analyse() {
             const double failedMs=std::chrono::duration<double,std::milli>(Clock::now()-analysisStart).count();
             const long long n=std::max(0LL,(long long)(failedMs+0.5));
             std::ofstream report(exeDir()/L"Logs"/L"analysis_timings.log",std::ios::app);
-            if(report){report<<"FAILED | CPU "<<cpuChoice<<" ("<<threads<<" threads) | GPU "<<gpuChoice<<" | Elapsed "<<n/60000<<":"<<std::setfill('0')<<std::setw(2)<<(n/1000)%60<<"."<<std::setw(3)<<n%1000<<" | "<<e.what()<<"
-
-";report.flush();}
+            if(report){report<<"FAILED | CPU "<<cpuChoice<<" ("<<threads<<" threads) | GPU "<<gpuChoice<<" | Elapsed "<<n/60000<<":"<<std::setfill('0')<<std::setw(2)<<(n/1000)%60<<"."<<std::setw(3)<<n%1000<<" | "<<e.what()<<"\n\n";report.flush();}
             analysis_.summary = std::string("ERROR:") + e.what();
         }
         if (!st.stop_requested()) PostMessageW(hwnd_, WM_ANALYSIS_DONE, 0, 0);
@@ -855,8 +847,7 @@ void App::applyGuide(){
         const auto fingerprint=trainingImageSha256(image_);
         if(fingerprint.empty())throw std::runtime_error("Could not fingerprint loaded image");
         record<<"{\"schema\":2,\"label\":\""<<safeFileName(analysis_.masks[idx].name)<<"\",\"image_sha256\":\""<<fingerprint<<"\",\"image\":\""<<imagePath.filename().string()<<"\",\"prediction\":\""<<maskPath.filename().string()
-              <<"\",\"width\":"<<image_.width<<",\"height\":"<<image_.height<<",\"area\":["<<r.left<<","<<r.top<<","<<r.right<<","<<r.bottom<<"],\"rotation_degrees\":"<<std::setprecision(10)<<(guideAngles_[idx]*180/pi)<<",\"rotation_origin\":["<<(r.left+r.right)*.5<<","<<(r.top+r.bottom)*.5<<"],\"annotation\":\"rough_bounds_only\",\"pixels_inside_verified\":false}
-";
+              <<"\",\"width\":"<<image_.width<<",\"height\":"<<image_.height<<",\"area\":["<<r.left<<","<<r.top<<","<<r.right<<","<<r.bottom<<"],\"rotation_degrees\":"<<std::setprecision(10)<<(guideAngles_[idx]*180/pi)<<",\"rotation_origin\":["<<(r.left+r.right)*.5<<","<<(r.top+r.bottom)*.5<<"],\"annotation\":\"rough_bounds_only\",\"pixels_inside_verified\":false}\n";
         if(!record)throw std::runtime_error("Could not complete area metadata");
         for(int y=0;y<mask.height;++y)for(int x=0;x<mask.width;++x)if(mask.pixels[size_t(y)*mask.width+x]&&!withinGuide(r,guideAngles_[idx],x+.5,y+.5))mask.pixels[size_t(y)*mask.width+x]=0;
         guideEdited_[idx]=false;showRaw_=false;SendMessageW(refinedView_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(rawView_,BM_SETCHECK,BST_UNCHECKED,0);
