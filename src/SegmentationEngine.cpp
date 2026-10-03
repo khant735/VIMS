@@ -710,6 +710,10 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
  }
  auto animal=first(animals); if(maskArea(animal)){
   const std::string a="Animals/Animal 1/Atlas";
+  const DeformFrame animalFrame=estimateDeformFrame(animal);
+  band=[&](const std::string& name,const std::string& parent,const Mask&s,double xa,double xb,double ya,double yb,float cf){
+   publish(name,parent,(&s==&animal&&animalFrame.valid)?deformAtlasBand(s,animalFrame,xa,xb,ya,yb):atlasBand(s,xa,xb,ya,yb),cf);
+  };
   band(a+"/Head/Skull and face",a+"/Head",animal,.00,.34,.08,.48,.17f);
   band(a+"/Head/Ears horns or antlers",a+"/Head",animal,.00,.36,.00,.25,.12f);
   band(a+"/Head/Eyes",a+"/Head",animal,.06,.29,.14,.29,.13f);
@@ -725,6 +729,10 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
  }
  auto vehicle=first(vehicles); if(maskArea(vehicle)){
   const std::string v="Vehicles/Vehicle 1/Atlas";
+  const DeformFrame vehicleFrame=estimateDeformFrame(vehicle);
+  band=[&](const std::string& name,const std::string& parent,const Mask&s,double xa,double xb,double ya,double yb,float cf){
+   publish(name,parent,(&s==&vehicle&&vehicleFrame.valid)?deformAtlasBand(s,vehicleFrame,xa,xb,ya,yb):atlasBand(s,xa,xb,ya,yb),cf);
+  };
   band(v+"/Body/Front section",v+"/Body",vehicle,.00,.30,.20,.82,.14f);
   band(v+"/Body/Centre chassis or fuselage",v+"/Body",vehicle,.25,.75,.20,.82,.16f);
   band(v+"/Body/Rear section",v+"/Body",vehicle,.70,1.0,.20,.82,.14f);
@@ -736,6 +744,10 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
  }
  auto tree=first(trees); if(maskArea(tree)){
   const std::string t="Scenery/Trees/Tree 1/Atlas";
+  const DeformFrame treeFrame=estimateDeformFrame(tree);
+  band=[&](const std::string& name,const std::string& parent,const Mask&s,double xa,double xb,double ya,double yb,float cf){
+   publish(name,parent,(&s==&tree&&treeFrame.valid)?deformAtlasBand(s,treeFrame,xa,xb,ya,yb):atlasBand(s,xa,xb,ya,yb),cf);
+  };
   band(t+"/Crown/Upper canopy",t+"/Crown",tree,.00,1.0,.00,.36,.16f);
   band(t+"/Crown/Middle canopy branches leaves needles",t+"/Crown",tree,.00,1.0,.25,.62,.16f);
   band(t+"/Crown/Lower branches foliage",t+"/Crown",tree,.04,.96,.50,.76,.14f);
