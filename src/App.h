@@ -24,7 +24,9 @@ private:
     UINT panButton_=0;
     POINT panStart_{};
     double panOriginX_=0,panOriginY_=0;
-    HWND cpuText_{};\n    HWND gpuText_{};\n    HWND operationLabel_{}, operationProgress_{};
+    HWND cpuText_{};
+    HWND gpuText_{};
+    HWND operationLabel_{}, operationProgress_{};
     HWND cpuCombo_{};
     HWND backendCombo_{};
     HWND openBtn_{};
@@ -101,7 +103,10 @@ private:
     void updateFaceModelStatus();
     int selectedMask() const;
     std::filesystem::path exeDir() const;
-    void setStatus(const std::wstring& s);\n    void beginOperation(const std::wstring& label, int percent=-1);\n    void updateOperation(const std::wstring& label, int percent=-1);\n    void endOperation();
+    void setStatus(const std::wstring& s);
+    void beginOperation(const std::wstring& label, int percent=-1);
+    void updateOperation(const std::wstring& label, int percent=-1);
+    void endOperation();
     void showError(const std::wstring& title, const std::wstring& message);
     static std::wstring widen(const std::string& s);
     static std::string safeFileName(std::string s);
