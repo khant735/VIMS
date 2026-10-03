@@ -28,7 +28,7 @@ jobs:
       - name: Install Vulkan SDK
         shell: pwsh
         run: |
-          $url = 'https://sdk.lunarg.com/sdk/download/1.4.357.0/windows/VulkanSDK-1.4.357.0-Installer.exe'
+          $url = 'https://sdk.lunarg.com/sdk/download/1.4.357.0/windows/vulkan_sdk.exe'
           Invoke-WebRequest $url -OutFile VulkanSDK.exe
           Start-Process .\VulkanSDK.exe -ArgumentList '--accept-licenses --default-answer --confirm-command install' -Wait
           $sdk = 'C:\VulkanSDK\1.4.357.0'
