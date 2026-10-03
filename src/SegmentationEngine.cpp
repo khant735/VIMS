@@ -570,6 +570,52 @@ static void describeImage(const ImageRGBA& image,const Mask& skin,const Mask& sk
  if(skinCount)result.descriptiveNodes.push_back(
   "People/Human/Person 1/Body/Skin colour/Observed pixel colour: "+skinRgb);
 }
+// Geometry-only atlas priors. These never invent pixels outside a detected subject;
+// they partition an existing semantic mask into low-confidence, pose-normalised guide regions.
+static Mask atlasBand(const Mask& subject,double xa,double xb,double ya,double yb){
+ Mask out{subject.width,subject.height,std::vector<uint8_t>(subject.pixels.size())};
+ int x0,y0,x1,y1;if(!bounds(subject,x0,y0,x1,y1))return out;
+ const double w=std::max(1,x1-x0+1),h=std::max(1,y1-y0+1);
+ for(int y=y0;y<=y1;++y)for(int x=x0;x<=x1;++x){size_t i=size_t(y)*subject.width+x;if(!subject.pixels[i])continue;
+  const double u=(x-x0+.5)/w,v=(y-y0+.5)/h;if(u>=xa&&u<=xb&&v>=ya&&v<=yb)out.pixels[i]=255;
+ }return out;
+}
+static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& animals,const Mask& vehicles,const Mask& trees){
+ size_t n=0;
+ auto publish=[&](const std::string& name,const std::string& parent,const Mask& m,float confidence){
+  if(maskArea(m)<32)return;
+  if(std::any_of(r.masks.begin(),r.masks.end(),[&](const NamedMask& x){return x.name==name;}))return;
+  NamedMask nm;nm.name=name;nm.parent=parent;nm.category="Atlas prior";nm.mask=m;
+  nm.source="normalised detected-subject atlas prior";nm.confidence=confidence;nm.provenance=MaskProvenance::LandmarkDerived;
+  nm.components=componentsOf(m,name);r.masks.push_back(std::move(nm));++n;
+ };
+ auto first=[&](const Mask& combined){auto v=significantInstances(combined);return v.empty()?Mask{combined.width,combined.height,std::vector<uint8_t>(combined.pixels.size())}:std::move(v.front());};
+ auto human=first(people); if(maskArea(human)){
+  publish("People/Human/Person 1/Body/Atlas/Head guide","People/Human/Person 1/Body/Atlas",atlasBand(human,.25,.75,0,.18),.30f);
+  publish("People/Human/Person 1/Body/Atlas/Upper torso guide","People/Human/Person 1/Body/Atlas",atlasBand(human,.20,.80,.18,.48),.28f);
+  publish("People/Human/Person 1/Body/Atlas/Pelvis guide","People/Human/Person 1/Body/Atlas",atlasBand(human,.28,.72,.43,.62),.25f);
+  publish("People/Human/Person 1/Body/Atlas/Left lower-limb guide","People/Human/Person 1/Body/Atlas",atlasBand(human,.48,.86,.56,1),.22f);
+  publish("People/Human/Person 1/Body/Atlas/Right lower-limb guide","People/Human/Person 1/Body/Atlas",atlasBand(human,.14,.52,.56,1),.22f);
+ }
+ auto animal=first(animals); if(maskArea(animal)){
+  publish("Animals/Animal 1/Atlas/Head guide","Animals/Animal 1/Atlas",atlasBand(animal,0,.36,.08,.55),.18f);
+  publish("Animals/Animal 1/Atlas/Torso guide","Animals/Animal 1/Atlas",atlasBand(animal,.22,.82,.16,.72),.18f);
+  publish("Animals/Animal 1/Atlas/Lower appendage guide","Animals/Animal 1/Atlas",atlasBand(animal,.12,.88,.60,1),.14f);
+  publish("Animals/Animal 1/Atlas/Tail-or-rear guide","Animals/Animal 1/Atlas",atlasBand(animal,.72,1,.12,.78),.12f);
+ }
+ auto vehicle=first(vehicles); if(maskArea(vehicle)){
+  publish("Vehicles/Vehicle 1/Atlas/Upper cabin guide","Vehicles/Vehicle 1/Atlas",atlasBand(vehicle,.18,.82,0,.48),.16f);
+  publish("Vehicles/Vehicle 1/Atlas/Body guide","Vehicles/Vehicle 1/Atlas",atlasBand(vehicle,0,1,.25,.82),.18f);
+  publish("Vehicles/Vehicle 1/Atlas/Running-gear guide","Vehicles/Vehicle 1/Atlas",atlasBand(vehicle,0,1,.68,1),.15f);
+ }
+ auto tree=first(trees); if(maskArea(tree)){
+  publish("Scenery/Trees/Tree 1/Atlas/Crown guide","Scenery/Trees/Tree 1/Atlas",atlasBand(tree,0,1,0,.68),.16f);
+  publish("Scenery/Trees/Tree 1/Atlas/Trunk guide","Scenery/Trees/Tree 1/Atlas",atlasBand(tree,.30,.70,.48,1),.16f);
+  publish("Scenery/Trees/Tree 1/Atlas/Root-base guide","Scenery/Trees/Tree 1/Atlas",atlasBand(tree,.18,.82,.84,1),.12f);
+ }
+ return n;
+}
+
 static void addAnatomyCatalog(AnalysisResult& result){
  const std::string p="People/Human/Person 1";
  bool human=false,animal=false;
@@ -1334,6 +1380,8 @@ AnalysisResult SegmentationEngine::analyse(const ImageRGBA&im){
       " approved or validated learned mask(s). ONNX model weights unchanged.";
   }
  }catch(const std::exception& e){CrashLog::write(std::string("Local learning skipped: ")+e.what());}
+ const size_t atlasPriors=addAtlasPriors(r,person,animal,veh,trees);
+ if(atlasPriors)r.imageReport+="\nReference atlas: added "+std::to_string(atlasPriors)+" low-confidence guide region(s) constrained to detected subjects; these are priors, not observations.";
  const size_t hiddenProjections=addOccludedSurfaceProjections(r,im,faceView);
  if(hiddenProjections)r.imageReport+="\nHidden-surface projections: "+std::to_string(hiddenProjections)+
   " low-confidence 2D footprints within detected subjects. No unseen pixels, depth, surface detail or geometry were observed; projections are excluded from training.";
