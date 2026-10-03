@@ -542,8 +542,10 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 if(log){log<<report.str();log.flush();}
             }
             const std::wstring reportText=report.str();
-            HWND results=CreateWindowExW(WS_EX_DLGMODALFRAME|WS_EX_CONTROLPARENT,L"STATIC",L"Render Test / Calibration",
-                WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_VISIBLE,
+            // Use a real top-level window class rather than STATIC. A STATIC top-level
+            // window does not reliably provide normal caption dragging/closing behaviour.
+            HWND results=CreateWindowExW(WS_EX_CONTROLPARENT,wc.lpszClassName,L"Render Test / Calibration",
+                WS_OVERLAPPEDWINDOW|WS_VISIBLE,
                 CW_USEDEFAULT,CW_USEDEFAULT,900,700,hwnd_,nullptr,instance_,nullptr);
             if(results){
                 HWND edit=CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",reportText.c_str(),
