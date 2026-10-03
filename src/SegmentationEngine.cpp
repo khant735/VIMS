@@ -575,6 +575,42 @@ static void describeImage(const ImageRGBA& image,const Mask& skin,const Mask& sk
  if(skinCount)result.descriptiveNodes.push_back(
   "People/Human/Person 1/Body/Skin colour/Observed pixel colour: "+skinRgb);
 }
+// Pixel-evidence skin atlas. Unlike geometry priors, these masks require an observed
+// local colour/texture feature inside the semantic skin mask.
+static size_t addSkinSurfaceAtlas(AnalysisResult& r,const ImageRGBA& im,const Mask& skin){
+ if(skin.empty()||maskArea(skin)<96)return 0;
+ const int W=im.width,H=im.height;size_t n=0;
+ double mr=0,mg=0,mb=0,ml=0;size_t count=0;
+ for(size_t i=0;i<skin.pixels.size();++i)if(skin.pixels[i]&&im.pixels[i*4+3]){
+  const auto*q=&im.pixels[i*4];mr+=q[0];mg+=q[1];mb+=q[2];ml+=(3*q[0]+6*q[1]+q[2])/10.0;++count;
+ }
+ if(!count)return 0;mr/=count;mg/=count;mb/=count;ml/=count;
+ auto blank=[&](){return Mask{W,H,std::vector<uint8_t>(size_t(W)*H)};};
+ Mask pigment=blank(),darkSpot=blank(),redBlue=blank(),crease=blank(),hair=blank();
+ auto lum=[&](int x,int y){const auto*q=&im.pixels[(size_t(y)*W+x)*4];return (3*q[0]+6*q[1]+q[2])/10;};
+ for(int y=1;y<H-1;++y)for(int x=1;x<W-1;++x){size_t i=size_t(y)*W+x;if(!skin.pixels[i])continue;const auto*q=&im.pixels[i*4];
+  const double d=std::abs(q[0]-mr)+std::abs(q[1]-mg)+std::abs(q[2]-mb);
+  if(d>42) pigment.pixels[i]=255;
+  if(lum(x,y)<ml*.62 && d>36) darkSpot.pixels[i]=255;
+  // Red/blue vessel-like colour cue; deliberately named as an appearance cue, not a medical vein diagnosis.
+  if((int(q[0])-int(q[1])>22)||(int(q[2])-int(q[1])>20))redBlue.pixels[i]=255;
+  const int gx=std::abs(lum(x+1,y)-lum(x-1,y)),gy=std::abs(lum(x,y+1)-lum(x,y-1));
+  if(gx+gy>46)crease.pixels[i]=255;
+  if(lum(x,y)<ml*.48 && (gx+gy)>58)hair.pixels[i]=255;
+ }
+ auto publish=[&](const char*leaf,const Mask&m,float cf){
+  if(maskArea(m)<24)return;std::string name="People/Human/Person 1/Skin surface/";name+=leaf;
+  NamedMask nm;nm.name=name;nm.parent="People/Human/Person 1/Skin surface";nm.category="Skin surface evidence";
+  nm.mask=m;nm.source="observed skin pixel colour/texture cue";nm.confidence=cf;nm.provenance=MaskProvenance::LandmarkDerived;
+  nm.components=componentsOf(m,name);r.masks.push_back(std::move(nm));++n;
+ };
+ publish("Pigmentation and colour-gradient changes",pigment,.28f);
+ publish("Dark spot or mark candidates",darkSpot,.18f);
+ publish("Visible red-blue vessel-like colour cues",redBlue,.16f);
+ publish("Crease fold wrinkle edge cues",crease,.20f);
+ publish("Hair follicle or strand-like dark edge cues",hair,.14f);
+ return n;
+}
 // Geometry-only atlas priors. These never invent pixels outside a detected subject;
 // they partition an existing semantic mask into low-confidence, pose-normalised guide regions.
 static Mask atlasBand(const Mask& subject,double xa,double xb,double ya,double yb){
@@ -1442,6 +1478,8 @@ AnalysisResult SegmentationEngine::analyse(const ImageRGBA&im){
       " approved or validated learned mask(s). ONNX model weights unchanged.";
   }
  }catch(const std::exception& e){CrashLog::write(std::string("Local learning skipped: ")+e.what());}
+ const size_t skinSurfacePriors=addSkinSurfaceAtlas(r,im,skin);
+ if(skinSurfacePriors)r.imageReport+="\nSkin surface atlas: added "+std::to_string(skinSurfacePriors)+" pixel-evidence cue mask(s); appearance cues are not medical diagnoses.";
  const size_t atlasPriors=addAtlasPriors(r,person,animal,veh,trees);
  if(atlasPriors)r.imageReport+="\nReference atlas: added "+std::to_string(atlasPriors)+" low-confidence guide region(s) constrained to detected subjects; these are priors, not observations.";
  const size_t hiddenProjections=addOccludedSurfaceProjections(r,im,faceView);
