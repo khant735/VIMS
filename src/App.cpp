@@ -293,12 +293,15 @@ void App::layout() {
     int x=pad,y=pad,w=available;
     const int row=S(24), btn=S(30), labelW=std::clamp(int(w*.48),S(175),S(245));
 
-    place(cpuText_,x,y,w,S(24)); y+=S(26);
-    place(gpuText_,x,y,w,S(24)); y+=S(26);
-    place(operationLabel_,x,y,w,S(20)); y+=S(21);
-    place(operationProgress_,x,y,w,S(18)); y+=S(22);
-    place(GetDlgItem(panelContent_,IDC_OPERATION_DETAIL),x,y,w,S(54)); y+=S(58);
-    place(GetDlgItem(panelContent_,IDC_OPERATION_LOG),x,y,w,S(82)); y+=S(88);
+    // Keep the active operation together as one compact status panel:
+    // title -> progress -> details -> activity -> hardware. This mirrors the
+    // operation mock-up and avoids scattering status information around the UI.
+    place(operationLabel_,x,y,w,S(24)); y+=S(27);
+    place(operationProgress_,x,y,w,S(20)); y+=S(24);
+    place(GetDlgItem(panelContent_,IDC_OPERATION_DETAIL),x,y,w,S(58)); y+=S(62);
+    place(GetDlgItem(panelContent_,IDC_OPERATION_LOG),x,y,w,S(86)); y+=S(90);
+    place(cpuText_,x,y,w,S(22)); y+=S(23);
+    place(gpuText_,x,y,w,S(22)); y+=S(27);
     place(cpuCombo_,x,y,w,S(200)); y+=S(30);
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
     place(openBtn_,x,y,(w-gap)/2,btn);
@@ -484,7 +487,14 @@ void App::updateOperation(const std::wstring& label,int percent){
 void App::endOperation(){
     SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);
     SendMessageW(operationProgress_,PBM_SETPOS,100,0);
-    SetWindowTextW(operationLabel_,L"Completed");
+    wchar_t current[256]{};
+    GetWindowTextW(operationLabel_,current,256);
+    std::wstring completed=current;
+    while(!completed.empty() && (completed.back()==L'.' || completed.back()==L' ')) completed.pop_back();
+    if(completed.empty()) completed=L"Operation";
+    completed += L" - Completed";
+    SetWindowTextW(operationLabel_,completed.c_str());
+    InvalidateRect(operationLabel_,nullptr,TRUE);UpdateWindow(operationLabel_);
     InvalidateRect(operationProgress_,nullptr,TRUE);UpdateWindow(operationProgress_);
 }
 void App::showError(const std::wstring& title, const std::wstring& message) { MessageBoxW(hwnd_, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR); }
