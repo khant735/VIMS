@@ -603,7 +603,9 @@ static size_t addSkinSurfaceAtlas(AnalysisResult& r,const ImageRGBA& im,const Ma
   if(maskArea(m)<24)return;std::string name="People/Human/Person 1/Skin surface/";name+=leaf;
   NamedMask nm;nm.name=name;nm.parent="People/Human/Person 1/Skin surface";nm.category="Skin surface evidence";
   nm.mask=m;nm.source="observed skin pixel colour/texture cue";nm.confidence=cf;nm.provenance=MaskProvenance::LandmarkDerived;
-  nm.components=componentsOf(m,name);r.masks.push_back(std::move(nm));++n;
+  // Surface-evidence masks are already full-resolution; avoid duplicating each one into
+  // component-sized full-frame bitmaps during analysis.
+  r.masks.push_back(std::move(nm));++n;
  };
  publish("Pigmentation and colour-gradient changes",pigment,.28f);
  publish("Dark spot or mark candidates",darkSpot,.18f);
@@ -667,7 +669,11 @@ static size_t addAtlasPriors(AnalysisResult& r,const Mask& people,const Mask& an
   if(std::any_of(r.masks.begin(),r.masks.end(),[&](const NamedMask& x){return x.name==name;}))return;
   NamedMask nm;nm.name=name;nm.parent=parent;nm.category="Atlas prior";nm.mask=m;
   nm.source="normalised detected-subject atlas prior";nm.confidence=confidence;nm.provenance=MaskProvenance::LandmarkDerived;
-  nm.components=componentsOf(m,name);r.masks.push_back(std::move(nm));++n;
+  // Atlas priors can number in the dozens. componentsOf() materialises another full-resolution
+  // bitmap for every connected component, multiplying memory use and causing std::bad_alloc on
+  // ordinary high-resolution photographs. The atlas mask itself is already subject-clipped;
+  // defer component expansion until a component is explicitly requested/exported.
+  r.masks.push_back(std::move(nm));++n;
  };
  auto first=[&](const Mask& combined){auto v=significantInstances(combined);return v.empty()?Mask{combined.width,combined.height,std::vector<uint8_t>(combined.pixels.size())}:std::move(v.front());};
  std::function<void(const std::string&,const std::string&,const Mask&,double,double,double,double,float)> band=
