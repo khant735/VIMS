@@ -34,6 +34,7 @@ private:
     HWND openBtn_{};
     HWND analyseBtn_{};
     HWND diagnosticsBtn_{};
+    HWND gpuSelfTestBtn_{};
     HWND maskLabel_{};
     HWND maskList_{};
     HWND boundaryCheck_{};
