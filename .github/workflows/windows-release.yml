@@ -109,11 +109,12 @@ jobs:
           "$hash  $zip" | Set-Content "$zip.sha256" -Encoding ascii
           "$crc32  $zip" | Set-Content "$zip.crc32" -Encoding ascii
           "RELEASE_ZIP=$zip" >> $env:GITHUB_ENV
+          "RELEASE_CRC32=$crc32" >> $env:GITHUB_ENV
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v6
         with:
-          name: VIMS-Windows-x64
+          name: VIMS-${{ github.ref_type == 'tag' && github.ref_name || 'development' }}-Windows-x64-CRC32-${{ env.RELEASE_CRC32 }}
           path: |
             ${{ env.RELEASE_ZIP }}
             ${{ env.RELEASE_ZIP }}.sha256
