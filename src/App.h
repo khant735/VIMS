@@ -39,7 +39,6 @@ private:
     HWND exportBtn_{};
     HWND exportAllBtn_{};
     HWND poseGifBtn_{};
-    HWND status_{};
     HWND refineGroup_{}, refineEnable_{}, boundarySlider_{}, materialSlider_{}, colourSlider_{}, radiusSlider_{};
     HWND boundaryValue_{}, materialValue_{}, colourValue_{}, radiusValue_{};
     HWND fillHoles_{}, removeIslands_{}, protectSkin_{}, rawView_{}, refinedView_{}, resetRefine_{};
