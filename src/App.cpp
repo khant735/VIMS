@@ -288,10 +288,12 @@ void App::layout() {
     // The children never move relative to one another. Scroll by shifting
     // the content window as a single clipped surface.
     SendMessageW(panelContent_,WM_SETREDRAW,FALSE,0);
-    HDWP batch=BeginDeferWindowPos(48);
+    // Position controls independently. A single bad/invalid HWND must not
+    // cancel the placement of every control that follows it.
     auto place=[&](HWND control,int xx,int yy,int ww,int hh){
-        if(batch)batch=DeferWindowPos(batch,control,nullptr,xx,yy,ww,hh,
-            SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW);
+        if(control && IsWindow(control))
+            SetWindowPos(control,nullptr,xx,yy,ww,hh,
+                SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW);
     };
     int x=pad,y=pad,w=available;
     const int row=S(24), btn=S(30), labelW=std::clamp(int(w*.48),S(175),S(245));
@@ -352,7 +354,6 @@ void App::layout() {
     place(exportBtn_,x,y,w,btn);y+=S(34);
     place(exportAllBtn_,x,y,w,btn);y+=S(34);
     place(poseGifBtn_,x,y,w,btn);y+=S(34);
-    if(batch)EndDeferWindowPos(batch);
     panelContentHeight_=y+pad;
     panelScroll_=std::clamp(panelScroll_,0,std::max(0,panelContentHeight_-ch));
     SetWindowPos(panelContent_,nullptr,0,-panelScroll_,contentWidth,panelContentHeight_,
