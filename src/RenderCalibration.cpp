@@ -44,3 +44,19 @@ void animateCalibrationScene(CalibrationScene& s,float t){
     s.smallAngle=-t*1.5f*(14.0f/10.0f)+0.15707963f;
     s.cameraAngle=t*0.55f;
 }
+
+const std::vector<CalibrationBackendInfo>& calibrationBackends(){
+    static const std::vector<CalibrationBackendInfo> b={
+        {CalibrationBackend::CpuSoftware,L"CPU Software",true,false},
+        {CalibrationBackend::Vulkan,L"Vulkan",true,false},
+        {CalibrationBackend::Direct3D12,L"Direct3D 12",true,false},
+        {CalibrationBackend::Direct3D11,L"Direct3D 11",true,false},
+        {CalibrationBackend::Direct3D9,L"Direct3D 9",true,false},
+        {CalibrationBackend::OpenGL,L"OpenGL",true,false},
+        {CalibrationBackend::OpenGLES,L"OpenGL ES",false,true},
+        {CalibrationBackend::WebGPU,L"WebGPU",false,true},
+        {CalibrationBackend::WebGL2,L"WebGL 2",false,true},
+        {CalibrationBackend::WebGL1,L"WebGL 1",false,true}
+    };
+    return b;
+}
