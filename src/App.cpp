@@ -544,7 +544,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
             const std::wstring reportText=report.str();
             // Use a real top-level window class rather than STATIC. A STATIC top-level
             // window does not reliably provide normal caption dragging/closing behaviour.
-            HWND results=CreateWindowExW(WS_EX_CONTROLPARENT,wc.lpszClassName,L"Render Test / Calibration",
+            HWND results=CreateWindowExW(WS_EX_CONTROLPARENT,L"VulkanImageMaskStudioMain",L"Render Test / Calibration",
                 WS_OVERLAPPEDWINDOW|WS_VISIBLE,
                 CW_USEDEFAULT,CW_USEDEFAULT,900,700,hwnd_,nullptr,instance_,nullptr);
             if(results){
