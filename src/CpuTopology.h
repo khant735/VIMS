@@ -13,6 +13,7 @@ public:
     bool smtAvailable() const { return logicalProcessors_ > physicalCores_; }
     int apply(Mode mode) const;
     std::wstring description() const;
+    std::wstring name() const;
 
 private:
     int physicalCores_ = 1;
