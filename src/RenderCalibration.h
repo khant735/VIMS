@@ -45,6 +45,8 @@ enum class CalibrationBackend {
     XboxOneD3D11,
     XboxSeriesD3D12,
     PspGu,
+    PsVitaGxm,
+    PsTvGxm,
     NvidiaShieldOpenGLES,
     NvidiaShieldVulkan
 };
@@ -53,5 +55,6 @@ struct CalibrationBackendInfo {
     const wchar_t* name;
     bool nativeWindows;
     bool browserOrMobile;
+    bool internetEligible;
 };
 const std::vector<CalibrationBackendInfo>& calibrationBackends();
