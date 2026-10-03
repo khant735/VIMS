@@ -1110,7 +1110,8 @@ void App::downloadFaceModel() {
         std::error_code logEc;
         std::filesystem::create_directories(logsDir, logEc);
         const auto launchLog = logsDir / L"model_downloader_launch.log";
-        { std::wofstream lf(launchLog, std::ios::trunc); lf << L"Starting PowerShell downloader. Script: " << script.wstring() << L"\\n"; }
+        { std::wofstream lf(launchLog, std::ios::trunc); lf << L"Starting PowerShell downloader. Script: " << script.wstring() << L"
+"; }
         std::wstring cmd=L"& { & '" + script.wstring() + L"' *>&1 | Tee-Object -FilePath '" + (logsDir/L"model_downloader_console.log").wstring() + L"'; exit $LASTEXITCODE }";
         std::wstring args=L"-NoProfile -ExecutionPolicy Bypass -Command \"" + cmd + L"\"";
         SHELLEXECUTEINFOW sei{sizeof(sei)};
