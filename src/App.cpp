@@ -226,7 +226,6 @@ void App::createUi() {
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_CREATE_PART),instance_,nullptr);
     approveBtn_=CreateWindowW(L"BUTTON",L"Approve mask for learning",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_APPROVE_MASK),instance_,nullptr);
-    status_ = CreateWindowW(L"STATIC", L"", WS_CHILD | SS_LEFT,0,0,0,0, panelContent_, nullptr, instance_, nullptr);
     faceModelBtn_=CreateWindowW(L"BUTTON",L"Download Core + Face AI Models",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,100,30,panelContent_,(HMENU)IDC_FACE_MODEL,instance_,nullptr);
     faceModelStatus_=CreateWindowW(L"STATIC",L"",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,100,22,panelContent_,nullptr,instance_,nullptr);
     updateFaceModelStatus();
@@ -347,7 +346,6 @@ void App::layout() {
     place(exportBtn_,x,y,w,btn);y+=S(34);
     place(exportAllBtn_,x,y,w,btn);y+=S(34);
     place(poseGifBtn_,x,y,w,btn);y+=S(34);
-    ShowWindow(status_,SW_HIDE);
     if(batch)EndDeferWindowPos(batch);
     panelContentHeight_=y+pad;
     panelScroll_=std::clamp(panelScroll_,0,std::max(0,panelContentHeight_-ch));
@@ -391,6 +389,12 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
         if((w&0xfff0)==SC_SIZE||(w&0xfff0)==SC_MOVE||(w&0xfff0)==SC_MAXIMIZE)return 0;
         break;
     case WM_TIMER: {
+        if(w==2 && analysing_){
+            // ONNX Runtime does not expose per-inference percentage callbacks.
+            // Advance only to 90% while the worker is active; completion sets 100%.
+            const int next=std::min(90,analysisProgress_ + (analysisProgress_<20?4:analysisProgress_<60?2:1));
+            if(next!=analysisProgress_) PostMessageW(hwnd_,WM_ANALYSIS_PROGRESS,next,0);
+        }
         if(vulkanReady_) renderer_.draw();
         static ULONGLONG lastTick=0; const ULONGLONG nowTick=GetTickCount64();
         if(nowTick-lastTick>=1000){
@@ -451,15 +455,6 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
         updateOperation(L"Analysing image... ("+std::to_wstring(analysisProgress_)+L"%)",analysisProgress_);
         return 0;
     case WM_FACE_MODEL_DONE: faceModelDone(w != 0); return 0;
-    case WM_TIMER:
-        if(w==2 && analysing_){
-            // ONNX Runtime does not expose per-inference percentage callbacks.
-            // Advance only to 90% while the worker is active; completion sets 100%.
-            const int next=std::min(90,analysisProgress_ + (analysisProgress_<20?4:analysisProgress_<60?2:1));
-            if(next!=analysisProgress_) PostMessageW(hwnd_,WM_ANALYSIS_PROGRESS,next,0);
-            return 0;
-        }
-        break;
     case WM_CLOSE:
         if (analysing_) worker_.request_stop();
         DestroyWindow(hwnd_); return 0;
