@@ -4,6 +4,7 @@
 #include "CrashLog.h"
 #include "LearningStore.h"
 #include "PoseGif.h"
+#include "RenderCalibration.h"
 #include <commdlg.h>
 #include <shlobj.h>
 #include <shellapi.h>
@@ -514,6 +515,14 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 }else report<<L"  Vulkan device/render: not tested (renderer currently bound to another adapter)\r\n";
                 report<<L"  DirectML per-adapter compute: pending scheduler implementation\r\n\r\n";
             }
+            report<<L"Platform compatibility probes (Windows theoretical analysis only)\\r\\n";
+            for(const auto& r:theoreticalCalibrationResults()){
+                const auto& all=calibrationBackends();
+                auto it=std::find_if(all.begin(),all.end(),[&](const CalibrationBackendInfo& b){return b.backend==r.backend;});
+                if(it==all.end()||!it->internetEligible)continue;
+                report<<L"  "<<it->name<<L": "<<calibrationResultName(r.kind)<<L"\\r\\n    "<<r.detail<<L"\\r\\n";
+            }
+            report<<L"\\r\\nNative Windows PASS means frames were actually presented. Platform compatibility results are theoretical and never count as a hardware render PASS.\\r\\n";
             report<<L"Note: this test intentionally uses a VIMS-generated rotating-workload concept; it does not copy Cogs game assets.";
             {
                 std::error_code ec; std::filesystem::create_directories(L"Logs",ec);
