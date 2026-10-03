@@ -162,7 +162,7 @@ void App::createUi() {
     zoomOutBtn_=CreateWindowW(L"BUTTON",L"-",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,34,28,hwnd_,(HMENU)IDC_ZOOM_OUT,instance_,nullptr);
     zoomFitBtn_=CreateWindowW(L"BUTTON",L"Fit image",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,90,28,hwnd_,(HMENU)IDC_ZOOM_FIT,instance_,nullptr);
     zoomInBtn_=CreateWindowW(L"BUTTON",L"+",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,34,28,hwnd_,(HMENU)IDC_ZOOM_IN,instance_,nullptr);
-    cpuText_ = CreateWindowW(L"STATIC", (L"CPU: " + cpu_.description()).c_str(), WS_CHILD | WS_VISIBLE,
+    cpuText_ = CreateWindowW(L"STATIC", (L"CPU: " + cpu_.name() + L" | " + cpu_.description()).c_str(), WS_CHILD | WS_VISIBLE,
         0,0,100,20, panelContent_, nullptr, instance_, nullptr);
     cpuUsageText_ = CreateWindowW(L"STATIC", L"CPU utilisation (all logical processors): sampling...", WS_CHILD | WS_VISIBLE,
         0,0,100,20, panelContent_, nullptr, instance_, nullptr);
