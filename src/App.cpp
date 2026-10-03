@@ -57,7 +57,12 @@ std::wstring utf8ToWide(const std::string& s) {
 
 struct GpuSample { std::wstring name; LUID luid{}; SIZE_T dedicatedBytes=0; int utilisation=-1; };
 std::wstring lowerCopy(std::wstring v){std::transform(v.begin(),v.end(),v.begin(),[](wchar_t x){return std::towlower(x);});return v;}
-std::wstring luidToken(const LUID& l){wchar_t b[64]{};swprintf(b,64,L"luid_0x%08x_0x%08x",(unsigned)l.HighPart,(unsigned)l.LowPart);return lowerCopy(b);}
+std::array<std::wstring,2> luidTokens(const LUID& l){
+    wchar_t a[64]{},b[64]{};
+    swprintf(a,64,L"luid_0x%08x_0x%08x",(unsigned)l.HighPart,(unsigned)l.LowPart);
+    swprintf(b,64,L"luid_0x%08x_0x%08x",(unsigned)l.LowPart,(unsigned)l.HighPart);
+    return {lowerCopy(a),lowerCopy(b)};
+}
 std::vector<GpuSample> queryGpuAdapters(){
     std::vector<GpuSample> out; IDXGIFactory1* factory=nullptr;
     if(FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1),(void**)&factory))) return out;
