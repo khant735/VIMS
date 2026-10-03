@@ -103,8 +103,9 @@ int App::run(int showCmd) {
 
     try {
         renderer_.initialize(view_);
-        std::wstring s = L"Vulkan: "; s += utf8ToWide(renderer_.gpuName());
-        setStatus(s); vulkanReady_ = true;
+        std::wstring gpu = L"GPU: "; gpu += utf8ToWide(renderer_.gpuName()); gpu += L" (Vulkan)";
+        SetWindowTextW(gpuText_,gpu.c_str());
+        vulkanReady_ = true;
     } catch (const std::exception& e) {
         showError(L"Vulkan initialisation failed", widen(e.what()));
         setStatus(L"Vulkan unavailable; UI remains open for diagnostics.");
@@ -343,7 +344,7 @@ void App::layout() {
     place(exportBtn_,x,y,w,btn);y+=S(34);
     place(exportAllBtn_,x,y,w,btn);y+=S(34);
     place(poseGifBtn_,x,y,w,btn);y+=S(34);
-    place(status_,x,y,w,S(58));y+=S(64);
+    ShowWindow(status_,SW_HIDE);
     if(batch)EndDeferWindowPos(batch);
     panelContentHeight_=y+pad;
     panelScroll_=std::clamp(panelScroll_,0,std::max(0,panelContentHeight_-ch));
@@ -456,7 +457,6 @@ void App::updateRefinementLabels(){wchar_t b[80];swprintf(b,80,L"Boundary Precis
 void App::resetRefinementControls(){SendMessageW(refineEnable_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(boundarySlider_,TBM_SETPOS,TRUE,70);SendMessageW(materialSlider_,TBM_SETPOS,TRUE,65);SendMessageW(colourSlider_,TBM_SETPOS,TRUE,55);SendMessageW(radiusSlider_,TBM_SETPOS,TRUE,8);SendMessageW(fillHoles_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(removeIslands_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(protectSkin_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(refinedView_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(rawView_,BM_SETCHECK,BST_UNCHECKED,0);showRaw_=false;updateRefinementLabels();}
 
 void App::setStatus(const std::wstring& s) {
-    SetWindowTextW(status_,s.c_str());
     if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL)) SetWindowTextW(detail,s.c_str());
     if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)){
         SYSTEMTIME t{};GetLocalTime(&t);wchar_t stamp[32]{};swprintf(stamp,32,L"[%02u:%02u:%02u] ",t.wHour,t.wMinute,t.wSecond);
@@ -484,6 +484,7 @@ void App::updateOperation(const std::wstring& label,int percent){
 void App::endOperation(){
     SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);
     SendMessageW(operationProgress_,PBM_SETPOS,100,0);
+    SetWindowTextW(operationLabel_,L"Completed");
     InvalidateRect(operationProgress_,nullptr,TRUE);UpdateWindow(operationProgress_);
 }
 void App::showError(const std::wstring& title, const std::wstring& message) { MessageBoxW(hwnd_, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR); }
