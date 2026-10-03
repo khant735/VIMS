@@ -60,6 +60,7 @@ private:
     CpuTopology cpu_;
     std::unique_ptr<SegmentationEngine> segmenter_;
     ImageRGBA image_;
+    std::filesystem::path loadedImagePath_;
     AnalysisResult analysis_;
     std::jthread worker_;
     bool analysing_ = false;
