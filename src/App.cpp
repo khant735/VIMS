@@ -659,7 +659,7 @@ void App::analysisDone() {
     TreeView_DeleteAllItems(maskList_);
     if (analysis_.summary.rfind("ERROR:", 0) == 0) {
         showError(L"Analysis failed", widen(analysis_.summary.substr(6)));
-        setStatus(L"Analysis failed."); return;
+        setStatus(L"Analysis failed."); endOperation(); return;
     }
     resetGuides();
     std::unordered_map<std::string,HTREEITEM> nodes;
@@ -700,6 +700,7 @@ void App::analysisDone() {
     if(firstMask)TreeView_SelectItem(maskList_,firstMask);
     setStatus(widen(analysis_.summary));
     updatePreview();
+    endOperation();
 }
 
 int App::selectedMask() const {
@@ -713,7 +714,6 @@ int App::selectedMask() const {
 
 namespace {
 double cubic(double x){x=std::abs(x);if(x<1)return 1.5*x*x*x-2.5*x*x+1;if(x<2)return -.5*x*x*x+2.5*x*x-4*x+2;return 0;}
-    endOperation();
 }
 void App::updatePreview() {
     if(image_.empty()||!vulkanReady_)return;
