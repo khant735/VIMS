@@ -485,7 +485,7 @@ void App::setStatus(const std::wstring& s) {
 void App::beginOperation(const std::wstring& label,int percent){
     SetWindowTextW(operationLabel_,label.c_str());
     if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL)) SetWindowTextW(detail,L"Working...");
-    if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)){SendMessageW(log,LB_RESETCONTENT,0,0);SendMessageW(log,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(label.c_str()));}
+    if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)) SendMessageW(log,LB_RESETCONTENT,0,0);
     LONG style=GetWindowLongW(operationProgress_,GWL_STYLE);
     if(percent<0){SetWindowLongW(operationProgress_,GWL_STYLE,style|PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETMARQUEE,TRUE,35);}
     else{SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);SetWindowLongW(operationProgress_,GWL_STYLE,style&~PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);}
@@ -494,7 +494,8 @@ void App::beginOperation(const std::wstring& label,int percent){
 void App::updateOperation(const std::wstring& label,int percent){
     SetWindowTextW(operationLabel_,label.c_str());
     if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL)) SetWindowTextW(detail,label.c_str());
-    if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)) SendMessageW(log,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(label.c_str()));
+    // Progress ticks belong in the title/bar, not in the activity history.
+    // The log is reserved for meaningful stage/result messages from setStatus().
     if(percent>=0)SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);
     RedrawWindow(panelContent_,nullptr,nullptr,RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW);
 }
@@ -606,6 +607,8 @@ void App::analyse() {
     analysisProgress_=0;
     beginOperation(L"Analysing image... (0%)",0);
     setStatus(L"Running segmentation and refinement...");
+    // Keep progress ticks out of the detail/log controls.
+    if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL)) SetWindowTextW(detail,L"Running segmentation and refinement...");
     SetTimer(hwnd_,2,500,nullptr);
     ImageRGBA input = image_;
     const std::string cpuChoice=sel==1?"Physical cores (SMT off)":sel==2?"SMT 25%":sel==3?"SMT 50%":sel==4?"SMT 75%":sel==5?"SMT 100%":"Auto CPU threads";
