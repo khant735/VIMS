@@ -1310,10 +1310,22 @@ static Mask refineMask(const ImageRGBA& im,const Mask& seed,const Mask* skin,con
  return cur;
 }
 }
-struct SegmentationEngine::Impl{HMODULE dll=nullptr;const OrtApi*api=nullptr;OrtEnv*env=nullptr;OrtSession*scene=nullptr;OrtSession*clothes=nullptr;OrtSession*face=nullptr;OrtSession*detail=nullptr;OrtSessionOptions*opts=nullptr;bool tryDml=true;bool requireDml=false;bool dmlAppended=false;};
-SegmentationEngine::SegmentationEngine(const std::filesystem::path&d):p_(new Impl),scene_(d/L"scene_ade20k.onnx"),clothes_(d/L"clothes_human_parsing.onnx"),face_(d/L"face_parsing.onnx"),detail_(d/L"detailed_face_teeth.onnx"){}
-SegmentationEngine::~SegmentationEngine(){if(p_){if(p_->api){if(p_->scene)p_->api->ReleaseSession(p_->scene);if(p_->clothes)p_->api->ReleaseSession(p_->clothes);if(p_->face)p_->api->ReleaseSession(p_->face);if(p_->detail)p_->api->ReleaseSession(p_->detail);if(p_->opts)p_->api->ReleaseSessionOptions(p_->opts);if(p_->env)p_->api->ReleaseEnv(p_->env);}if(p_->dll)FreeLibrary(p_->dll);delete p_;}}
+struct SegmentationEngine::Impl{HMODULE dll=nullptr;const OrtApi*api=nullptr;OrtEnv*env=nullptr;OrtSession*scene=nullptr;OrtSession*clothes=nullptr;OrtSession*face=nullptr;OrtSession*detail=nullptr;OrtSession*wholeBodyPose=nullptr;OrtSession*handPose=nullptr;OrtSession*animalPose=nullptr;OrtSessionOptions*opts=nullptr;bool tryDml=true;bool requireDml=false;bool dmlAppended=false;};
+SegmentationEngine::SegmentationEngine(const std::filesystem::path&d):p_(new Impl),scene_(d/L"scene_ade20k.onnx"),clothes_(d/L"clothes_human_parsing.onnx"),face_(d/L"face_parsing.onnx"),detail_(d/L"detailed_face_teeth.onnx"),wholeBodyPose_(d/L"human_wholebody_pose.onnx"),handPose_(d/L"hand_pose.onnx"),animalPose_(d/L"animal_pose_ap10k.onnx"){}
+SegmentationEngine::~SegmentationEngine(){if(p_){if(p_->api){if(p_->scene)p_->api->ReleaseSession(p_->scene);if(p_->clothes)p_->api->ReleaseSession(p_->clothes);if(p_->face)p_->api->ReleaseSession(p_->face);if(p_->detail)p_->api->ReleaseSession(p_->detail);if(p_->wholeBodyPose)p_->api->ReleaseSession(p_->wholeBodyPose);if(p_->handPose)p_->api->ReleaseSession(p_->handPose);if(p_->animalPose)p_->api->ReleaseSession(p_->animalPose);if(p_->opts)p_->api->ReleaseSessionOptions(p_->opts);if(p_->env)p_->api->ReleaseEnv(p_->env);}if(p_->dll)FreeLibrary(p_->dll);delete p_;}}
 void SegmentationEngine::setThreads(int n){threads_=std::max(1,n);} bool SegmentationEngine::modelsPresent()const{return std::filesystem::exists(scene_)&&std::filesystem::exists(clothes_);} 
+
+struct PoseModelInfo{bool installed=false;bool sessionReady=false;size_t inputs=0,outputs=0;std::string diagnostic;};
+static PoseModelInfo inspectPoseModel(SegmentationEngine::Impl*p,const std::filesystem::path&path,OrtSession*&sess){
+ PoseModelInfo r;r.installed=std::filesystem::exists(path);if(!r.installed){r.diagnostic="not installed";return r;}
+ auto a=p->api;try{
+  if(!sess){ortck(a,a->CreateSession(p->env,path.c_str(),p->opts,&sess));}
+  ortck(a,a->SessionGetInputCount(sess,&r.inputs));ortck(a,a->SessionGetOutputCount(sess,&r.outputs));
+  r.sessionReady=r.inputs>0&&r.outputs>0;
+  r.diagnostic=r.sessionReady?("ready ("+std::to_string(r.inputs)+" input, "+std::to_string(r.outputs)+" output tensor(s))"):"invalid tensor interface";
+ }catch(const std::exception&e){r.diagnostic=e.what();}
+ return r;
+}
 static std::vector<uint16_t> runModel(SegmentationEngine::Impl*p,const std::filesystem::path&path,OrtSession*&sess,const ImageRGBA&im,int threads,int expected,const Mask* crop=nullptr,bool easyPortrait=false){auto a=p->api;OrtAllocator*alloc=nullptr;char*in=nullptr,*out=nullptr;OrtMemoryInfo*mi=nullptr;OrtValue*t=nullptr,*yv=nullptr;OrtTensorTypeAndShapeInfo*ti=nullptr;
  auto cleanup=[&](){if(ti)a->ReleaseTensorTypeAndShapeInfo(ti);if(yv)a->ReleaseValue(yv);if(t)a->ReleaseValue(t);if(mi)a->ReleaseMemoryInfo(mi);if(alloc){if(in)alloc->Free(alloc,in);if(out)alloc->Free(alloc,out);}};
  try {if(!p->env)ortck(a,a->CreateEnv(ORT_LOGGING_LEVEL_WARNING,"VIMS",&p->env));if(!p->opts){ortck(a,a->CreateSessionOptions(&p->opts));a->SetIntraOpNumThreads(p->opts,threads);a->DisableCpuMemArena(p->opts);a->SetSessionGraphOptimizationLevel(p->opts,ORT_ENABLE_ALL);
@@ -1364,9 +1376,21 @@ AnalysisResult SegmentationEngine::analyse(const ImageRGBA&im){
  if(p_->clothes){p_->api->ReleaseSession(p_->clothes);p_->clothes=nullptr;}
  if(p_->face){p_->api->ReleaseSession(p_->face);p_->face=nullptr;}
  if(p_->detail){p_->api->ReleaseSession(p_->detail);p_->detail=nullptr;}
+ if(p_->wholeBodyPose){p_->api->ReleaseSession(p_->wholeBodyPose);p_->wholeBodyPose=nullptr;}
+ if(p_->handPose){p_->api->ReleaseSession(p_->handPose);p_->handPose=nullptr;}
+ if(p_->animalPose){p_->api->ReleaseSession(p_->animalPose);p_->animalPose=nullptr;}
  if(p_->opts){p_->api->ReleaseSessionOptions(p_->opts);p_->opts=nullptr;}
  p_->tryDml=backend_!=Backend::CPU;p_->requireDml=backend_==Backend::DirectML;p_->dmlAppended=false;
- CrashLog::write(backend_==Backend::CPU?"Inference mode: CPU":backend_==Backend::DirectML?"Inference mode: DirectML required":"Inference mode: Auto"); const auto setupEnd=Clock::now();auto sl=runModel(p_,scene_,p_->scene,im,threads_,(int)ade.size());const auto sceneEnd=Clock::now();auto cl=runModel(p_,clothes_,p_->clothes,im,threads_,(int)clothes.size());const auto clothingEnd=Clock::now();auto clothingFace=classMask(cl,im.width,im.height,clothes,{"Face"});int fx0,fy0,fx1,fy1;bool haveFaceAnchor=bounds(clothingFace,fx0,fy0,fx1,fy1);gpuActive_=p_->dmlAppended;AnalysisResult r; std::vector<uint16_t> fl; bool haveFace=std::filesystem::exists(face_); if(haveFace) fl=runModel(p_,face_,p_->face,im,threads_,(int)face19.size(),haveFaceAnchor?&clothingFace:nullptr);const auto faceEnd=Clock::now();r.setupMs=elapsed(begin,setupEnd);r.sceneMs=elapsed(setupEnd,sceneEnd);r.clothingMs=elapsed(sceneEnd,clothingEnd);r.faceMs=elapsed(clothingEnd,faceEnd);r.usedDirectML=gpuActive_;auto sky=classMask(sl,im.width,im.height,ade,{"sky"});auto person=classMask(sl,im.width,im.height,ade,{"person"});auto hp=classMask(cl,im.width,im.height,clothes,{"Hat","Hair","Sunglasses","Upper-clothes","Skirt","Pants","Dress","Belt","Left-shoe","Right-shoe","Face","Left-leg","Right-leg","Left-arm","Right-arm","Bag","Scarf"});person=mor(person,hp);auto veh=classMask(sl,im.width,im.height,ade,{"car","boat","bus","truck","airplane","van","ship","minibike","bicycle"});auto animal=classMask(sl,im.width,im.height,ade,{"animal"});auto scenery=classMask(sl,im.width,im.height,ade,{"building","tree","road","grass","sidewalk","earth","mountain","plant","water","house","sea","field","sand","path","river","bridge","hill","land","waterfall","lake"});auto clothing=classMask(cl,im.width,im.height,clothes,{"Hat","Upper-clothes","Skirt","Pants","Dress","Belt","Left-shoe","Right-shoe","Scarf"});auto skin=classMask(cl,im.width,im.height,clothes,{"Face","Left-leg","Right-leg","Left-arm","Right-arm"});auto acc=classMask(cl,im.width,im.height,clothes,{"Sunglasses","Bag"});
+ CrashLog::write(backend_==Backend::CPU?"Inference mode: CPU":backend_==Backend::DirectML?"Inference mode: DirectML required":"Inference mode: Auto");
+ // Validate optional pose specialists through the same ORT/device configuration. Decoding is
+ // enabled only after their exact tensor contracts are known; geometry remains the fallback.
+ const auto wholePoseInfo=inspectPoseModel(p_,wholeBodyPose_,p_->wholeBodyPose);
+ const auto handPoseInfo=inspectPoseModel(p_,handPose_,p_->handPose);
+ const auto animalPoseInfo=inspectPoseModel(p_,animalPose_,p_->animalPose);
+ CrashLog::write("Whole-body pose: "+wholePoseInfo.diagnostic);
+ CrashLog::write("Hand pose: "+handPoseInfo.diagnostic);
+ CrashLog::write("Animal pose: "+animalPoseInfo.diagnostic);
+ const auto setupEnd=Clock::now();auto sl=runModel(p_,scene_,p_->scene,im,threads_,(int)ade.size());const auto sceneEnd=Clock::now();auto cl=runModel(p_,clothes_,p_->clothes,im,threads_,(int)clothes.size());const auto clothingEnd=Clock::now();auto clothingFace=classMask(cl,im.width,im.height,clothes,{"Face"});int fx0,fy0,fx1,fy1;bool haveFaceAnchor=bounds(clothingFace,fx0,fy0,fx1,fy1);gpuActive_=p_->dmlAppended;AnalysisResult r; std::vector<uint16_t> fl; bool haveFace=std::filesystem::exists(face_); if(haveFace) fl=runModel(p_,face_,p_->face,im,threads_,(int)face19.size(),haveFaceAnchor?&clothingFace:nullptr);const auto faceEnd=Clock::now();r.setupMs=elapsed(begin,setupEnd);r.sceneMs=elapsed(setupEnd,sceneEnd);r.clothingMs=elapsed(sceneEnd,clothingEnd);r.faceMs=elapsed(clothingEnd,faceEnd);r.usedDirectML=gpuActive_;auto sky=classMask(sl,im.width,im.height,ade,{"sky"});auto person=classMask(sl,im.width,im.height,ade,{"person"});auto hp=classMask(cl,im.width,im.height,clothes,{"Hat","Hair","Sunglasses","Upper-clothes","Skirt","Pants","Dress","Belt","Left-shoe","Right-shoe","Face","Left-leg","Right-leg","Left-arm","Right-arm","Bag","Scarf"});person=mor(person,hp);auto veh=classMask(sl,im.width,im.height,ade,{"car","boat","bus","truck","airplane","van","ship","minibike","bicycle"});auto animal=classMask(sl,im.width,im.height,ade,{"animal"});auto scenery=classMask(sl,im.width,im.height,ade,{"building","tree","road","grass","sidewalk","earth","mountain","plant","water","house","sea","field","sand","path","river","bridge","hill","land","waterfall","lake"});auto clothing=classMask(cl,im.width,im.height,clothes,{"Hat","Upper-clothes","Skirt","Pants","Dress","Belt","Left-shoe","Right-shoe","Scarf"});auto skin=classMask(cl,im.width,im.height,clothes,{"Face","Left-leg","Right-leg","Left-arm","Right-arm"});auto acc=classMask(cl,im.width,im.height,clothes,{"Sunglasses","Bag"});
  add(r.rawMasks,"Clothing",clothing);add(r.rawMasks,"Skin",skin);add(r.rawMasks,"Accessories",acc);add(r.rawMasks,"People",person);add(r.rawMasks,"Vehicles",veh);add(r.rawMasks,"Animals",animal);add(r.rawMasks,"Sky",sky);add(r.rawMasks,"Scenery",scenery); std::vector<std::pair<std::string,Mask>> personParts={{"clothing",clothing},{"skin",skin},{"accessories",acc}}; addInstances(r.rawMasks,"person",person,personParts);addInstances(r.rawMasks,"vehicle",veh);addInstances(r.rawMasks,"animal",animal); auto trees=classMask(sl,im.width,im.height,ade,{"tree"});addInstances(r.rawMasks,"tree",trees);auto upper=classMask(cl,im.width,im.height,clothes,{"Upper-clothes"});
  auto pants=classMask(cl,im.width,im.height,clothes,{"Pants"});
  auto scarf=classMask(cl,im.width,im.height,clothes,{"Scarf"});
@@ -1511,6 +1535,8 @@ AnalysisResult SegmentationEngine::analyse(const ImageRGBA&im){
       faceView.leftEye&&faceView.rightEye?"two-eye pose":"orientation uncertain")<<".";
   r.imageReport+=faceReport.str();CrashLog::write(faceReport.str());
  }
+ r.imageReport+="\nPose specialists: whole-body "+wholePoseInfo.diagnostic+", hand "+handPoseInfo.diagnostic+", animal "+animalPoseInfo.diagnostic+
+  ". Geometric atlas fallback remains active until each model's output tensors are decoded and confidence-filtered.";
  deriveVisibleSubregions(r,im);
  if(settings_.enabled){
   const auto [refinedParts,refinedPixels]=refineAllVisibleBoundaries(r,im);
