@@ -511,7 +511,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     }
                     if(!saved.empty())renderer_.setImage(saved);
                     const double seconds=std::max(0.001,double(GetTickCount64()-start)/1000.0);
-                    report<<L"  Vulkan device: PASS [active renderer]\r\n  Cog-style render workload: PASS ("<<std::fixed<<std::setprecision(1)<<(frames/seconds)<<L" frames/s)\r\n";
+                    report<<L"  Vulkan device: PASS [active renderer]\r\n  Legacy 2D gear preview: PASS ("<<std::fixed<<std::setprecision(1)<<(frames/seconds)<<L" frames/s)\r\n";
                 }else report<<L"  Vulkan device/render: not tested (renderer currently bound to another adapter)\r\n";
                 report<<L"  DirectML per-adapter compute: pending scheduler implementation\r\n\r\n";
             }
