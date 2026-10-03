@@ -541,7 +541,20 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 std::wofstream log(std::filesystem::path(L"Logs")/stamp,std::ios::out|std::ios::trunc);
                 if(log){log<<report.str();log.flush();}
             }
-            MessageBoxW(hwnd_,report.str().c_str(),L"Render Test / Calibration",MB_OK|MB_ICONINFORMATION);
+            const std::wstring reportText=report.str();
+            HWND results=CreateWindowExW(WS_EX_DLGMODALFRAME|WS_EX_CONTROLPARENT,L"STATIC",L"Render Test / Calibration",
+                WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_VISIBLE,
+                CW_USEDEFAULT,CW_USEDEFAULT,900,700,hwnd_,nullptr,instance_,nullptr);
+            if(results){
+                HWND edit=CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",reportText.c_str(),
+                    WS_CHILD|WS_VISIBLE|WS_VSCROLL|WS_HSCROLL|ES_LEFT|ES_MULTILINE|ES_AUTOVSCROLL|ES_AUTOHSCROLL|ES_READONLY,
+                    12,12,858,610,results,nullptr,instance_,nullptr);
+                HWND close=CreateWindowW(L"BUTTON",L"Close",WS_CHILD|WS_VISIBLE|BS_DEFPUSHBUTTON,
+                    780,632,90,28,results,(HMENU)IDCANCEL,instance_,nullptr);
+                SendMessageW(edit,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);
+                SendMessageW(close,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);
+                SetFocus(edit);
+            }else MessageBoxW(hwnd_,reportText.c_str(),L"Render Test / Calibration",MB_OK|MB_ICONINFORMATION);
         }
         else if (id == IDC_DIAGNOSTICS && code == BN_CLICKED) runtimeDiagnostics(true);
         else if (id == IDC_EXPORT && code == BN_CLICKED) exportSelected();
