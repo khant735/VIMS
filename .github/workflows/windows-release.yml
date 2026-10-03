@@ -1,0 +1,81 @@
+name: Windows release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install LLVM-MinGW
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/mstorsjo/llvm-mingw/releases/download/20260908/llvm-mingw-20260908-ucrt-x86_64.zip'
+          Invoke-WebRequest $url -OutFile llvm-mingw.zip
+          Expand-Archive llvm-mingw.zip -DestinationPath deps
+          $root = (Get-ChildItem deps -Directory | Select-Object -First 1).FullName
+          "LLVM_MINGW_ROOT=$root" >> $env:GITHUB_ENV
+
+      - name: Install Vulkan SDK
+        shell: pwsh
+        run: |
+          $url = 'https://sdk.lunarg.com/sdk/download/1.4.357.0/windows/VulkanSDK-1.4.357.0-Installer.exe'
+          Invoke-WebRequest $url -OutFile VulkanSDK.exe
+          Start-Process .\VulkanSDK.exe -ArgumentList '--accept-licenses --default-answer --confirm-command install' -Wait
+          $sdk = 'C:\VulkanSDK\1.4.357.0'
+          if (-not (Test-Path "$sdk\Include\vulkan\vulkan.h")) { throw 'Vulkan SDK installation failed' }
+          "VULKAN_SDK=$sdk" >> $env:GITHUB_ENV
+
+      - name: Install ONNX Runtime
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/microsoft/onnxruntime/releases/download/v1.30.0/onnxruntime-win-x64-1.30.0.zip'
+          Invoke-WebRequest $url -OutFile onnxruntime.zip
+          Expand-Archive onnxruntime.zip -DestinationPath deps
+          $root = (Resolve-Path 'deps\onnxruntime-win-x64-1.30.0').Path
+          "ONNXRUNTIME_ROOT=$root" >> $env:GITHUB_ENV
+
+      - name: Build
+        shell: pwsh
+        run: .\build.ps1
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $out = 'build\Release'
+          Copy-Item download_models.ps1 $out -Force
+          Copy-Item models $out -Recurse -Force
+          Copy-Item LICENSE,THIRD_PARTY.md $out -Force
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'development' }
+          $zip = "VIMS-$version-Windows-x64.zip"
+          Compress-Archive -Path "$out\*" -DestinationPath $zip -CompressionLevel Optimal -Force
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $zip" | Set-Content "$zip.sha256" -Encoding ascii
+          "RELEASE_ZIP=$zip" >> $env:GITHUB_ENV
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VIMS-Windows-x64
+          path: |
+            ${{ env.RELEASE_ZIP }}
+            ${{ env.RELEASE_ZIP }}.sha256
+          compression-level: 0
+
+      - name: Publish tagged release assets
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.RELEASE_ZIP }}
+            ${{ env.RELEASE_ZIP }}.sha256
+          generate_release_notes: true
