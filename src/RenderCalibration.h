@@ -61,3 +61,12 @@ struct CalibrationBackendInfo {
     bool theoreticalProbeOnly;
 };
 const std::vector<CalibrationBackendInfo>& calibrationBackends();
+
+enum class CalibrationResultKind { RenderPass, RenderFail, TheoreticalCompatible, TranslationRequired, TheoreticalIncompatible, Unavailable };
+struct CalibrationResult {
+    CalibrationBackend backend;
+    CalibrationResultKind kind;
+    const wchar_t* detail;
+};
+const wchar_t* calibrationResultName(CalibrationResultKind kind);
+std::vector<CalibrationResult> theoreticalCalibrationResults();
