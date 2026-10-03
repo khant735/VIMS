@@ -544,15 +544,25 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
             const std::wstring reportText=report.str();
             // Use a real top-level window class rather than STATIC. A STATIC top-level
             // window does not reliably provide normal caption dragging/closing behaviour.
+            RECT appRect{};GetWindowRect(hwnd_,&appRect);
+            const int resultW=900;
+            const int maxH=std::max(360,(appRect.bottom-appRect.top)-80);
+            const int resultH=std::min(700,maxH);
+            const int resultX=appRect.left+std::max(0,((appRect.right-appRect.left)-resultW)/2);
+            const int resultY=appRect.top+std::max(0,((appRect.bottom-appRect.top)-resultH)/2);
+            const DWORD resultStyle=WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX|WS_VISIBLE;
             HWND results=CreateWindowExW(WS_EX_CONTROLPARENT,L"VulkanImageMaskStudioMain",L"Render Test / Calibration",
-                WS_OVERLAPPEDWINDOW|WS_VISIBLE,
-                CW_USEDEFAULT,CW_USEDEFAULT,900,700,hwnd_,nullptr,instance_,nullptr);
+                resultStyle,resultX,resultY,resultW,resultH,hwnd_,nullptr,instance_,nullptr);
             if(results){
+                RECT rc{};GetClientRect(results,&rc);
+                const int pad=12,buttonH=28,buttonW=90,gap=10;
+                const int editW=std::max(100,rc.right-pad*2);
+                const int editH=std::max(100,rc.bottom-pad*2-buttonH-gap);
                 HWND edit=CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",reportText.c_str(),
-                    WS_CHILD|WS_VISIBLE|WS_VSCROLL|WS_HSCROLL|ES_LEFT|ES_MULTILINE|ES_AUTOVSCROLL|ES_AUTOHSCROLL|ES_READONLY,
-                    12,12,858,610,results,nullptr,instance_,nullptr);
+                    WS_CHILD|WS_VISIBLE|WS_VSCROLL|ES_LEFT|ES_MULTILINE|ES_AUTOVSCROLL|ES_READONLY|ES_WANTRETURN,
+                    pad,pad,editW,editH,results,nullptr,instance_,nullptr);
                 HWND close=CreateWindowW(L"BUTTON",L"Close",WS_CHILD|WS_VISIBLE|BS_DEFPUSHBUTTON,
-                    780,632,90,28,results,(HMENU)IDCANCEL,instance_,nullptr);
+                    rc.right-pad-buttonW,pad+editH+gap,buttonW,buttonH,results,(HMENU)IDCANCEL,instance_,nullptr);
                 SendMessageW(edit,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);
                 SendMessageW(close,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);
                 SetFocus(edit);
