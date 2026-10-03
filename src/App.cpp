@@ -229,7 +229,7 @@ void App::createUi() {
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_OPEN), instance_, nullptr);
     analyseBtn_ = CreateWindowW(L"BUTTON", L"Analyse image", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_ANALYSE), instance_, nullptr);
-    gpuSelfTestBtn_ = CreateWindowW(L"BUTTON", L"GPU cog self-test", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    gpuSelfTestBtn_ = CreateWindowW(L"BUTTON", L"Render Test / Calibration", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_GPU_SELFTEST), instance_, nullptr);
     diagnosticsBtn_ = CreateWindowW(L"BUTTON", L"Runtime diagnostics", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_DIAGNOSTICS), instance_, nullptr);
@@ -475,7 +475,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
         else if (id == IDC_GPU_SELFTEST && code == BN_CLICKED){
             const auto adapters=queryGpuAdapters();
             LUID active{};const bool hasActive=vulkanReady_&&renderer_.gpuLuid(active);
-            std::wstringstream report;report<<L"VIMS GPU Cog Self-Test\r\n\r\n";
+            std::wstringstream report;report<<L"VIMS Render Test / Calibration\r\n\r\n";
             if(adapters.empty()) report<<L"No hardware GPU is exposed to Windows/DXGI. A firmware-disabled or driver-disabled iGPU cannot be render-tested.\r\n";
             for(size_t i=0;i<adapters.size();++i){
                 const auto& g=adapters[i];const bool selected=hasActive&&g.luid.HighPart==active.HighPart&&g.luid.LowPart==active.LowPart;
@@ -514,7 +514,14 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 report<<L"  DirectML per-adapter compute: pending scheduler implementation\r\n\r\n";
             }
             report<<L"Note: this test intentionally uses a VIMS-generated rotating-workload concept; it does not copy Cogs game assets.";
-            MessageBoxW(hwnd_,report.str().c_str(),L"GPU Cog Self-Test",MB_OK|MB_ICONINFORMATION);
+            {
+                std::error_code ec; std::filesystem::create_directories(L"Logs",ec);
+                SYSTEMTIME st{};GetLocalTime(&st);wchar_t stamp[64]{};
+                swprintf(stamp,64,L"render_test_%04u%02u%02u_%02u%02u%02u.log",st.wYear,st.wMonth,st.wDay,st.wHour,st.wMinute,st.wSecond);
+                std::wofstream log(std::filesystem::path(L"Logs")/stamp,std::ios::out|std::ios::trunc);
+                if(log){log<<report.str();log.flush();}
+            }
+            MessageBoxW(hwnd_,report.str().c_str(),L"Render Test / Calibration",MB_OK|MB_ICONINFORMATION);
         }
         else if (id == IDC_DIAGNOSTICS && code == BN_CLICKED) runtimeDiagnostics(true);
         else if (id == IDC_EXPORT && code == BN_CLICKED) exportSelected();
