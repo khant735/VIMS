@@ -477,7 +477,15 @@ void VulkanRenderer::destroyGearResources(){
 }
 void VulkanRenderer::createGearResources(){
     auto vs=readSpv(L"cog.vert.spv"),fs=readSpv(L"cog.frag.spv");if(vs.empty()||fs.empty())return;
-    std::vector<GearVertex> verts;std::vector<uint32_t> inds;appendGear(verts,inds,14,1.00f,1.16f,.32f,.22f);appendSpindle(verts,inds,.25f,.40f);gearIndexCount_=(uint32_t)inds.size();
+    std::vector<GearVertex> verts;std::vector<uint32_t> inds;
+    // Matched-module 16T/8T pair. Radius is proportional to tooth count so both
+    // gears retain the same circumferential tooth pitch.
+    appendGear(verts,inds,16,1.00f,1.16f,.32f,.22f);appendSpindle(verts,inds,.25f,.40f);
+    gearLargeIndexCount_=(uint32_t)inds.size();
+    const uint32_t smallVertexBase=(uint32_t)verts.size();gearSmallFirstIndex_=(uint32_t)inds.size();
+    std::vector<GearVertex> sv;std::vector<uint32_t> si;appendGear(sv,si,8,.50f,.58f,.20f,.22f);appendSpindle(sv,si,.15f,.40f);
+    verts.insert(verts.end(),sv.begin(),sv.end());for(uint32_t i:si)inds.push_back(i+smallVertexBase);
+    gearSmallIndexCount_=(uint32_t)si.size();gearIndexCount_=(uint32_t)inds.size();
     auto buffer=[&](VkDeviceSize size,VkBufferUsageFlags use,VkBuffer&b,VkDeviceMemory&m,const void*src){VkBufferCreateInfo bi{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};bi.size=size;bi.usage=use;bi.sharingMode=VK_SHARING_MODE_EXCLUSIVE;vkCheck(vkCreateBuffer(device_,&bi,nullptr,&b),"Could not create gear buffer.");VkMemoryRequirements mr{};vkGetBufferMemoryRequirements(device_,b,&mr);VkMemoryAllocateInfo ai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};ai.allocationSize=mr.size;ai.memoryTypeIndex=findMemoryType(mr.memoryTypeBits,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);vkCheck(vkAllocateMemory(device_,&ai,nullptr,&m),"Could not allocate gear buffer.");vkBindBufferMemory(device_,b,m,0);void*p{};vkMapMemory(device_,m,0,size,0,&p);std::memcpy(p,src,(size_t)size);vkUnmapMemory(device_,m);};
     buffer(verts.size()*sizeof(GearVertex),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,gearVertexBuffer_,gearVertexMemory_,verts.data());buffer(inds.size()*4,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,gearIndexBuffer_,gearIndexMemory_,inds.data());
     VkAttachmentDescription at[2]{};at[0].format=swapFormat_;at[0].samples=VK_SAMPLE_COUNT_1_BIT;at[0].loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;at[0].storeOp=VK_ATTACHMENT_STORE_OP_STORE;at[0].initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;at[0].finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;at[1].format=VK_FORMAT_D32_SFLOAT;at[1].samples=VK_SAMPLE_COUNT_1_BIT;at[1].loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;at[1].storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE;at[1].initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;at[1].finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -491,14 +499,14 @@ bool VulkanRenderer::drawGearCalibration(float seconds){
     uint32_t imageIndex=0;VkResult acq=vkAcquireNextImageKHR(device_,swapchain_,UINT64_MAX,imageAvailable_,VK_NULL_HANDLE,&imageIndex);if(acq==VK_ERROR_OUT_OF_DATE_KHR){resized();return false;}if(acq!=VK_SUCCESS&&acq!=VK_SUBOPTIMAL_KHR)return false;
     VkCommandBuffer cmd=beginOneTime();VkClearValue clears[2]{};clears[0].color={{.025f,.035f,.055f,1}};clears[1].depthStencil={1,0};VkRenderPassBeginInfo rb{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};rb.renderPass=gearRenderPass_;rb.framebuffer=gearFramebuffers_[imageIndex];rb.renderArea.extent=extent_;rb.clearValueCount=2;rb.pClearValues=clears;vkCmdBeginRenderPass(cmd,&rb,VK_SUBPASS_CONTENTS_INLINE);vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,gearPipeline_);VkDeviceSize off=0;vkCmdBindVertexBuffers(cmd,0,1,&gearVertexBuffer_,&off);vkCmdBindIndexBuffer(cmd,gearIndexBuffer_,0,VK_INDEX_TYPE_UINT32);VkViewport viewport{0,0,(float)extent_.width,(float)extent_.height,0,1};VkRect2D sc{{0,0},extent_};vkCmdSetViewport(cmd,0,1,&viewport);vkCmdSetScissor(cmd,0,1,&sc);
     struct PC{Mat4 mvp,model;float color[4];};float orbit=seconds*.45f;V3 eye{5.2f*std::cos(orbit),5.2f*std::sin(orbit),3.7f};Mat4 vp=mul(perspective(.82f,float(extent_.width)/float(extent_.height),.1f,30),lookAt(eye,{0,0,0},{0,0,1}));
-    auto gear=[&](float x,float scale,float spin,float r,float g,float b){Mat4 model=mul(translate(x,0,0),rotZ(spin));model.m[0]*=scale;model.m[1]*=scale;model.m[4]*=scale;model.m[5]*=scale;model.m[8]*=scale;model.m[9]*=scale;model.m[10]*=scale;PC pc{mul(vp,model),model,{r,g,b,1}};vkCmdPushConstants(cmd,gearPipelineLayout_,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(pc),&pc);vkCmdDrawIndexed(cmd,gearIndexCount_,1,0,0,0);};
-    // Equal-module 14T pair: pitch radius is halfway between root and tip.
-    // Centre distance = sum of pitch radii; second gear is offset by half a tooth
-    // so a tooth enters the opposing root gap instead of colliding tip-to-tip.
-    constexpr float pitchR=(1.00f+1.16f)*.5f;
-    constexpr float centre=pitchR;
-    constexpr float halfTooth=3.14159265359f/14.0f;
-    const float spin=seconds*1.6f;
-    gear(-centre,1, spin,.86f,.58f,.16f);
-    gear( centre,1,-spin+halfTooth,.22f,.48f,.88f);vkCmdEndRenderPass(cmd);vkEndCommandBuffer(cmd);VkPipelineStageFlags wait=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};si.waitSemaphoreCount=1;si.pWaitSemaphores=&imageAvailable_;si.pWaitDstStageMask=&wait;si.commandBufferCount=1;si.pCommandBuffers=&cmd;si.signalSemaphoreCount=1;si.pSignalSemaphores=&renderFinished_;if(vkQueueSubmit(queue_,1,&si,VK_NULL_HANDLE)!=VK_SUCCESS){vkFreeCommandBuffers(device_,commandPool_,1,&cmd);return false;}VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};pi.waitSemaphoreCount=1;pi.pWaitSemaphores=&renderFinished_;pi.swapchainCount=1;pi.pSwapchains=&swapchain_;pi.pImageIndices=&imageIndex;VkResult pr=vkQueuePresentKHR(queue_,&pi);vkQueueWaitIdle(queue_);vkFreeCommandBuffers(device_,commandPool_,1,&cmd);if(pr==VK_ERROR_OUT_OF_DATE_KHR||pr==VK_SUBOPTIMAL_KHR)resized();return pr==VK_SUCCESS||pr==VK_SUBOPTIMAL_KHR;
+    auto gear=[&](float x,float spin,float r,float g,float b,uint32_t count,uint32_t first){Mat4 model=mul(translate(x,0,0),rotZ(spin));PC pc{mul(vp,model),model,{r,g,b,1}};vkCmdPushConstants(cmd,gearPipelineLayout_,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(pc),&pc);vkCmdDrawIndexed(cmd,count,1,first,0,0);};
+    // Matched-module 16T driver / 8T driven gear. Pitch radii are 1.08 and
+    // 0.54, giving a 1.62 centre distance. The 8T gear counter-rotates at 2x
+    // angular speed, with a half-tooth phase offset to place teeth in gaps.
+    constexpr float centreDistance=1.62f;
+    constexpr float leftX=-.54f,rightX=1.08f;
+    constexpr float smallHalfTooth=3.14159265359f/8.0f;
+    const float spin=seconds*1.35f;
+    gear(leftX, spin,.86f,.58f,.16f,gearLargeIndexCount_,0);
+    gear(rightX,-2.0f*spin+smallHalfTooth,.22f,.48f,.88f,gearSmallIndexCount_,gearSmallFirstIndex_);vkCmdEndRenderPass(cmd);vkEndCommandBuffer(cmd);VkPipelineStageFlags wait=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};si.waitSemaphoreCount=1;si.pWaitSemaphores=&imageAvailable_;si.pWaitDstStageMask=&wait;si.commandBufferCount=1;si.pCommandBuffers=&cmd;si.signalSemaphoreCount=1;si.pSignalSemaphores=&renderFinished_;if(vkQueueSubmit(queue_,1,&si,VK_NULL_HANDLE)!=VK_SUCCESS){vkFreeCommandBuffers(device_,commandPool_,1,&cmd);return false;}VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};pi.waitSemaphoreCount=1;pi.pWaitSemaphores=&renderFinished_;pi.swapchainCount=1;pi.pSwapchains=&swapchain_;pi.pImageIndices=&imageIndex;VkResult pr=vkQueuePresentKHR(queue_,&pi);vkQueueWaitIdle(queue_);vkFreeCommandBuffers(device_,commandPool_,1,&cmd);if(pr==VK_ERROR_OUT_OF_DATE_KHR||pr==VK_SUBOPTIMAL_KHR)resized();return pr==VK_SUCCESS||pr==VK_SUBOPTIMAL_KHR;
 }
