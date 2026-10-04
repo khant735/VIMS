@@ -618,11 +618,23 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 report<<L"GPU "<<i<<L": "<<g.name<<L"\r\n  DXGI detection: PASS\r\n";
                 report<<L"  Adapter type: "<<(g.dedicatedBytes?L"dedicated/local-memory":L"integrated/shared-memory")<<L"\r\n";
                 if(selected){
+                    // Make the calibration scene visibly own the preview while it runs.
+                    // WM_PAINT/WM_ERASEBKGND from the child view can otherwise repaint over
+                    // freshly presented Vulkan frames while this synchronous test pumps messages.
+                    SetWindowTextW(status_,L"3D Vulkan self-test: rendering two gears in the preview...");
+                    RedrawWindow(view_,nullptr,nullptr,RDW_INVALIDATE|RDW_UPDATENOW);
                     const ULONGLONG start=GetTickCount64();unsigned frames=0;
-                    while(GetTickCount64()-start<4000){
+                    while(GetTickCount64()-start<6000){
                         const float t=float(GetTickCount64()-start)/1000.0f;
                         if(renderer_.drawGearCalibration(t))++frames;
-                        MSG msg{};while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
+                        MSG msg{};
+                        while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){
+                            if(msg.hwnd==view_&&(msg.message==WM_PAINT||msg.message==WM_ERASEBKGND)){
+                                ValidateRect(view_,nullptr);
+                                continue;
+                            }
+                            TranslateMessage(&msg);DispatchMessageW(&msg);
+                        }
                     }
                     const double seconds=std::max(0.001,double(GetTickCount64()-start)/1000.0);
                     if(!image_.empty())renderer_.setImage(image_);
