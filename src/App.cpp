@@ -210,7 +210,8 @@ void App::createUi() {
     SendMessageW(operationProgress_,PBM_SETPOS,0,0);
     CreateWindowW(L"STATIC",L"Open an image to begin.",WS_CHILD|WS_VISIBLE|SS_LEFT,
         0,0,100,54,panelContent_,reinterpret_cast<HMENU>(IDC_OPERATION_DETAIL),instance_,nullptr);
-    CreateWindowExW(WS_EX_CLIENTEDGE,L"LISTBOX",nullptr,WS_CHILD|WS_VISIBLE|WS_VSCROLL|LBS_NOINTEGRALHEIGHT,
+    CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",nullptr,
+        WS_CHILD|WS_VISIBLE|WS_VSCROLL|ES_LEFT|ES_MULTILINE|ES_AUTOVSCROLL|ES_READONLY|ES_WANTRETURN,
         0,0,100,82,panelContent_,reinterpret_cast<HMENU>(IDC_OPERATION_LOG),instance_,nullptr);
     cpuCombo_ = CreateWindowW(L"COMBOBOX", nullptr, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
         0,0,100,200, panelContent_, reinterpret_cast<HMENU>(IDC_CPUCOMBO), instance_, nullptr);
@@ -613,15 +614,22 @@ void App::setStatus(const std::wstring& s) {
     if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL)) SetWindowTextW(detail,s.c_str());
     if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)){
         SYSTEMTIME t{};GetLocalTime(&t);wchar_t stamp[32]{};swprintf(stamp,32,L"[%02u:%02u:%02u] ",t.wHour,t.wMinute,t.wSecond);
-        std::wstring line=stamp+s;SendMessageW(log,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(line.c_str()));
-        const LRESULT count=SendMessageW(log,LB_GETCOUNT,0,0);if(count>200)SendMessageW(log,LB_DELETESTRING,0,0);
-        SendMessageW(log,LB_SETTOPINDEX,std::max<LRESULT>(0,count-6),0);
+        std::wstring line=stamp+s+L"\r\n";
+        SendMessageW(log,EM_SETSEL,(WPARAM)-1,(LPARAM)-1);
+        SendMessageW(log,EM_REPLACESEL,FALSE,reinterpret_cast<LPARAM>(line.c_str()));
+        const int len=GetWindowTextLengthW(log);
+        if(len>32768){
+            SendMessageW(log,EM_SETSEL,0,len-24576);
+            SendMessageW(log,EM_REPLACESEL,FALSE,reinterpret_cast<LPARAM>(L""));
+        }
+        SendMessageW(log,EM_SETSEL,(WPARAM)-1,(LPARAM)-1);
+        SendMessageW(log,EM_SCROLLCARET,0,0);
     }
 }
 void App::beginOperation(const std::wstring& label,int percent){
     SetWindowTextW(operationLabel_,label.c_str());
     if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL)) SetWindowTextW(detail,L"Working...");
-    if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)) SendMessageW(log,LB_RESETCONTENT,0,0);
+    if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)) SetWindowTextW(log,L"");
     LONG style=GetWindowLongW(operationProgress_,GWL_STYLE);
     if(percent<0){SetWindowLongW(operationProgress_,GWL_STYLE,style|PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETMARQUEE,TRUE,35);}
     else{SendMessageW(operationProgress_,PBM_SETMARQUEE,FALSE,0);SetWindowLongW(operationProgress_,GWL_STYLE,style&~PBS_MARQUEE);SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);}
