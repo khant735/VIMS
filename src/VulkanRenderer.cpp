@@ -577,3 +577,27 @@ bool VulkanRenderer::drawGearCalibration(float seconds,uint32_t targetWidth,uint
     transition(cmd,swapImages_[imageIndex],VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,VK_ACCESS_TRANSFER_WRITE_BIT,0,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     vkEndCommandBuffer(cmd);VkPipelineStageFlags wait=VK_PIPELINE_STAGE_TRANSFER_BIT;VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};si.waitSemaphoreCount=1;si.pWaitSemaphores=&imageAvailable_;si.pWaitDstStageMask=&wait;si.commandBufferCount=1;si.pCommandBuffers=&cmd;si.signalSemaphoreCount=1;si.pSignalSemaphores=&renderFinished_;if(vkQueueSubmit(queue_,1,&si,VK_NULL_HANDLE)!=VK_SUCCESS){vkFreeCommandBuffers(device_,commandPool_,1,&cmd);return false;}VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};pi.waitSemaphoreCount=1;pi.pWaitSemaphores=&renderFinished_;pi.swapchainCount=1;pi.pSwapchains=&swapchain_;pi.pImageIndices=&imageIndex;VkResult pr=vkQueuePresentKHR(queue_,&pi);vkQueueWaitIdle(queue_);vkFreeCommandBuffers(device_,commandPool_,1,&cmd);if(pr==VK_ERROR_OUT_OF_DATE_KHR||pr==VK_SUBOPTIMAL_KHR)resized();return pr==VK_SUCCESS||pr==VK_SUBOPTIMAL_KHR;
 }
+
+double VulkanRenderer::benchmarkGearCalibration(float seconds,uint32_t targetWidth,uint32_t targetHeight,unsigned milliseconds){
+    if(!device_||!gearPipeline_||!targetWidth||!targetHeight)return 0.0;
+    VkExtent2D wanted{targetWidth,targetHeight};
+    if(wanted.width!=gearTargetExtent_.width||wanted.height!=gearTargetExtent_.height||!gearOffscreenFramebuffer_){vkDeviceWaitIdle(device_);gearTargetExtent_=wanted;createGearFramebuffers();}
+    auto record=[&](float t){
+        VkCommandBuffer cmd=beginOneTime();VkClearValue clears[2]{};clears[0].color={{.025f,.035f,.055f,1}};clears[1].depthStencil={1,0};
+        VkRenderPassBeginInfo rb{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};rb.renderPass=gearRenderPass_;rb.framebuffer=gearOffscreenFramebuffer_;rb.renderArea.extent=gearTargetExtent_;rb.clearValueCount=2;rb.pClearValues=clears;vkCmdBeginRenderPass(cmd,&rb,VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,gearPipeline_);VkDeviceSize off=0;vkCmdBindVertexBuffers(cmd,0,1,&gearVertexBuffer_,&off);vkCmdBindIndexBuffer(cmd,gearIndexBuffer_,0,VK_INDEX_TYPE_UINT32);
+        VkViewport viewport{0,0,(float)gearTargetExtent_.width,(float)gearTargetExtent_.height,0,1};VkRect2D sc{{0,0},gearTargetExtent_};vkCmdSetViewport(cmd,0,1,&viewport);vkCmdSetScissor(cmd,0,1,&sc);
+        struct PC{Mat4 mvp,model;float color[4];};float orbit=t*.45f;V3 eye{5.8f*std::cos(orbit),5.8f*std::sin(orbit),4.1f};float aspect=float(gearTargetExtent_.width)/float(gearTargetExtent_.height);float fov=(aspect<1.0f)?1.02f:.90f;Mat4 vp=mul(perspective(fov,aspect,.035f,40.0f),lookAt(eye,{0.22f,0,0},{0,0,1}));
+        auto part=[&](float x,float spin,float material,uint32_t count,uint32_t first){int mi=std::clamp((int)(material+0.5f),0,2);vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,gearPipelineLayout_,0,1,&gearDescriptorSets_[mi],0,nullptr);Mat4 model=mul(translate(x,0,0),rotZ(spin));PC pc{mul(vp,model),model,{0,0,0,material}};vkCmdPushConstants(cmd,gearPipelineLayout_,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(pc),&pc);vkCmdDrawIndexed(cmd,count,1,first,0,0);};
+        constexpr float leftX=-.54f,rightX=1.08f,smallHalfTooth=3.14159265359f/8.0f;const float spin=t*1.35f,smallSpin=-2.0f*spin+smallHalfTooth;
+        part(leftX,spin,0.0f,gearLargeIndexCount_,0);part(leftX,spin,2.0f,gearLargeSpindleIndexCount_,gearLargeSpindleFirstIndex_);part(rightX,smallSpin,1.0f,gearSmallIndexCount_,gearSmallFirstIndex_);part(rightX,smallSpin,2.0f,gearSmallSpindleIndexCount_,gearSmallSpindleFirstIndex_);
+        vkCmdEndRenderPass(cmd);vkEndCommandBuffer(cmd);return cmd;
+    };
+    const ULONGLONG start=GetTickCount64();unsigned frames=0;
+    while(GetTickCount64()-start<milliseconds){
+        VkCommandBuffer cmd=record(seconds+float(frames)*0.001f);VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};si.commandBufferCount=1;si.pCommandBuffers=&cmd;
+        if(vkQueueSubmit(queue_,1,&si,VK_NULL_HANDLE)!=VK_SUCCESS){vkFreeCommandBuffers(device_,commandPool_,1,&cmd);break;}
+        vkQueueWaitIdle(queue_);vkFreeCommandBuffers(device_,commandPool_,1,&cmd);++frames;
+    }
+    const double elapsed=std::max(0.001,double(GetTickCount64()-start)/1000.0);return frames/elapsed;
+}
