@@ -510,9 +510,9 @@ bool VulkanRenderer::drawGearCalibration(float seconds){
     constexpr float leftX=-.54f,rightX=1.08f;
     constexpr float smallHalfTooth=3.14159265359f/8.0f;
     const float spin=seconds*1.35f;
-    part(leftX, spin,0.0f,gearLargeIndexCount_,0); // wood
-    part(leftX, spin,2.0f,gearLargeSpindleIndexCount_,gearLargeSpindleFirstIndex_); // metal spindle
     const float smallSpin=-2.0f*spin+smallHalfTooth;
-    part(rightX,smallSpin,1.0f,gearSmallIndexCount_,gearSmallFirstIndex_); // blue resin
-    part(rightX,smallSpin,2.0f,gearSmallSpindleIndexCount_,gearSmallSpindleFirstIndex_); // metal spindlevkCmdEndRenderPass(cmd);vkEndCommandBuffer(cmd);VkPipelineStageFlags wait=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};si.waitSemaphoreCount=1;si.pWaitSemaphores=&imageAvailable_;si.pWaitDstStageMask=&wait;si.commandBufferCount=1;si.pCommandBuffers=&cmd;si.signalSemaphoreCount=1;si.pSignalSemaphores=&renderFinished_;if(vkQueueSubmit(queue_,1,&si,VK_NULL_HANDLE)!=VK_SUCCESS){vkFreeCommandBuffers(device_,commandPool_,1,&cmd);return false;}VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};pi.waitSemaphoreCount=1;pi.pWaitSemaphores=&renderFinished_;pi.swapchainCount=1;pi.pSwapchains=&swapchain_;pi.pImageIndices=&imageIndex;VkResult pr=vkQueuePresentKHR(queue_,&pi);vkQueueWaitIdle(queue_);vkFreeCommandBuffers(device_,commandPool_,1,&cmd);if(pr==VK_ERROR_OUT_OF_DATE_KHR||pr==VK_SUBOPTIMAL_KHR)resized();return pr==VK_SUCCESS||pr==VK_SUBOPTIMAL_KHR;
+    // Draw each complete mesh once while the material shader is validated.
+    // Splitting spindle subranges caused the regression/crash on the live RX 580 path.
+    part(leftX, spin,0.0f,gearLargeIndexCount_+gearLargeSpindleIndexCount_,0);
+    part(rightX,smallSpin,1.0f,gearSmallIndexCount_+gearSmallSpindleIndexCount_,gearSmallFirstIndex_);vkCmdEndRenderPass(cmd);vkEndCommandBuffer(cmd);VkPipelineStageFlags wait=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};si.waitSemaphoreCount=1;si.pWaitSemaphores=&imageAvailable_;si.pWaitDstStageMask=&wait;si.commandBufferCount=1;si.pCommandBuffers=&cmd;si.signalSemaphoreCount=1;si.pSignalSemaphores=&renderFinished_;if(vkQueueSubmit(queue_,1,&si,VK_NULL_HANDLE)!=VK_SUCCESS){vkFreeCommandBuffers(device_,commandPool_,1,&cmd);return false;}VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};pi.waitSemaphoreCount=1;pi.pWaitSemaphores=&renderFinished_;pi.swapchainCount=1;pi.pSwapchains=&swapchain_;pi.pImageIndices=&imageIndex;VkResult pr=vkQueuePresentKHR(queue_,&pi);vkQueueWaitIdle(queue_);vkFreeCommandBuffers(device_,commandPool_,1,&cmd);if(pr==VK_ERROR_OUT_OF_DATE_KHR||pr==VK_SUBOPTIMAL_KHR)resized();return pr==VK_SUCCESS||pr==VK_SUBOPTIMAL_KHR;
 }
