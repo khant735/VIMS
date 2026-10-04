@@ -618,34 +618,17 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 report<<L"GPU "<<i<<L": "<<g.name<<L"\r\n  DXGI detection: PASS\r\n";
                 report<<L"  Adapter type: "<<(g.dedicatedBytes?L"dedicated/local-memory":L"integrated/shared-memory")<<L"\r\n";
                 if(selected){
-                    // Generate a visible two-gear benchmark frame on the CPU, upload it through the
-                    // normal Vulkan image path, and animate it in the preview for two seconds.
-                    // This deliberately uses only two interlocking gears.
-                    ImageRGBA saved=image_;
-                    const int W=640,H=480; ImageRGBA test; test.width=W;test.height=H;test.pixels.resize(size_t(W)*H*4);
-                    auto frame=[&](double phase){
-                        std::fill(test.pixels.begin(),test.pixels.end(),0);
-                        for(int y=0;y<H;++y)for(int x=0;x<W;++x){size_t p=(size_t(y)*W+x)*4;test.pixels[p]=12;test.pixels[p+1]=14;test.pixels[p+2]=20;test.pixels[p+3]=255;}
-                        auto gear=[&](double cx,double cy,double radius,int teeth,double angle,unsigned char r,unsigned char gg,unsigned char b){
-                            for(int y=std::max(0,int(cy-radius-14));y<std::min(H,int(cy+radius+14));++y)for(int x=std::max(0,int(cx-radius-14));x<std::min(W,int(cx+radius+14));++x){
-                                double dx=x-cx,dy=y-cy,rr=std::sqrt(dx*dx+dy*dy),a=std::atan2(dy,dx)-angle;
-                                double edge=radius+((std::cos(a*teeth)>0.20)?11.0:0.0);
-                                bool body=rr<edge&&rr>radius*.28;
-                                if(body){double light=std::clamp(.55+.45*(dx-dy)/(radius*1.414),.25,1.0);size_t p=(size_t(y)*W+x)*4;
-                                    test.pixels[p]=(unsigned char)(r*light);test.pixels[p+1]=(unsigned char)(gg*light);test.pixels[p+2]=(unsigned char)(b*light);test.pixels[p+3]=255;}
-                            }
-                        };
-                        gear(245,240,92,14,phase,210,174,70);
-                        gear(405,240,66,10,-phase*1.4+0.16,125,165,215);
-                    };
                     const ULONGLONG start=GetTickCount64();unsigned frames=0;
-                    while(GetTickCount64()-start<2000){
-                        const double t=double(GetTickCount64()-start)/1000.0;frame(t*2.2);renderer_.setImage(test);renderer_.draw();++frames;
+                    while(GetTickCount64()-start<4000){
+                        const float t=float(GetTickCount64()-start)/1000.0f;
+                        if(renderer_.drawGearCalibration(t))++frames;
                         MSG msg{};while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
                     }
-                    if(!saved.empty())renderer_.setImage(saved);
                     const double seconds=std::max(0.001,double(GetTickCount64()-start)/1000.0);
-                    report<<L"  Vulkan device: PASS [active renderer]\r\n  Legacy 2D gear preview: PASS ("<<std::fixed<<std::setprecision(1)<<(frames/seconds)<<L" frames/s)\r\n";
+                    if(!image_.empty())renderer_.setImage(image_);
+                    report<<L"  Vulkan device: PASS [active renderer]\r\n";
+                    if(frames) report<<L"  3D Vulkan gear render: PASS ("<<std::fixed<<std::setprecision(1)<<(frames/seconds)<<L" frames/s)\r\n";
+                    else report<<L"  3D Vulkan gear render: UNAVAILABLE (graphics pipeline/shaders not ready)\r\n";
                 }else report<<L"  Vulkan device/render: not tested (renderer currently bound to another adapter)\r\n";
                 report<<L"  DirectML per-adapter compute: pending scheduler implementation\r\n\r\n";
             }
