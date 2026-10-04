@@ -353,7 +353,7 @@ void App::layout() {
     wchar_t cpuBuf[2048]{};GetWindowTextW(cpuText_,cpuBuf,2048);
     DrawTextW(cpuDc,cpuBuf,-1,&cpuMeasure,DT_CALCRECT|DT_WORDBREAK|DT_LEFT);
     if(cpuOld)SelectObject(cpuDc,cpuOld);ReleaseDC(cpuText_,cpuDc);
-    const int cpuH=std::max(S(22),cpuMeasure.bottom-cpuMeasure.top+S(4));
+    const int cpuH=std::max<int>(S(22),static_cast<int>(cpuMeasure.bottom-cpuMeasure.top)+S(4));
     place(cpuText_,x,y,w,cpuH); y+=cpuH+S(5);
     const int cpuUsageLines=2+cpu_.physicalCores()+cpu_.logicalProcessors();
     const int cpuUsageH=S(std::max(44,cpuUsageLines*18));
