@@ -68,6 +68,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'cog.vert shader compilation failed' }
           & $glslc src\cog.frag -o src\cog.frag.spv
           if ($LASTEXITCODE -ne 0) { throw 'cog.frag shader compilation failed' }
+          # The renderer loads these beside the executable at runtime.
+          New-Item -ItemType Directory -Force -Path build\Release | Out-Null
+          Copy-Item src\cog.vert.spv,src\cog.frag.spv build\Release -Force
 
       - name: Build
         shell: pwsh
