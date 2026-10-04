@@ -660,7 +660,11 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     // Make the calibration scene visibly own the preview while it runs.
                     // WM_PAINT/WM_ERASEBKGND from the child view can otherwise repaint over
                     // freshly presented Vulkan frames while this synchronous test pumps messages.
-                    setStatus(L"3D Vulkan self-test: rendering two gears in the preview...");
+                    {
+                        std::wstring sceneTitle=L"VIMS Render Scene - Vulkan - "+g.name;
+                        SetWindowTextW(hwnd_,sceneTitle.c_str());
+                    }
+                    setStatus((L"3D Vulkan self-test: Vulkan | "+g.name+L" | rendering two gears...").c_str());
                     RedrawWindow(view_,nullptr,nullptr,RDW_INVALIDATE|RDW_UPDATENOW);
                     const ULONGLONG start=GetTickCount64();unsigned frames=0;
                     while(GetTickCount64()-start<6000){
@@ -698,8 +702,13 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 if(i==0){
                     D3D11CalibrationRenderer d3d;
                     std::wstring d3dError;
-                    setStatus(L"3D Direct3D 11 self-test: executing native D3D11 renderer...");
+                    setStatus(L"3D Direct3D 11 self-test: starting native renderer...");
                     if(d3d.initialize(view_,d3dError)){
+                        {
+                            std::wstring sceneTitle=L"VIMS Render Scene - Direct3D 11 - "+d3d.gpuName();
+                            SetWindowTextW(hwnd_,sceneTitle.c_str());
+                            setStatus((L"3D Direct3D 11 self-test: Direct3D 11 | "+d3d.gpuName()+L" | rendering two gears...").c_str());
+                        }
                         const ULONGLONG d3dStart=GetTickCount64();unsigned d3dFrames=0;
                         while(GetTickCount64()-d3dStart<3000){
                             const float t=float(GetTickCount64()-d3dStart)/1000.0f;
@@ -723,6 +732,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                         renderer_.initialize(view_);
                         vulkanReady_=true;
                         if(!image_.empty())renderer_.setImage(image_);
+                        SetWindowTextW(hwnd_,L"Vulkan Image Mask Studio");
                     }catch(const std::exception& e){
                         report<<L"  Vulkan restore after D3D11: FAILED - "<<widen(e.what())<<L"\r\n";
                     }
