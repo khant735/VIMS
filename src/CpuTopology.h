@@ -14,6 +14,7 @@ public:
     int apply(Mode mode) const;
     std::wstring description() const;
     std::wstring name() const;
+    const std::vector<std::vector<int>>& coreLogicalProcessors() const { return coreLogicalProcessors_; }
 
 private:
     int physicalCores_ = 1;
@@ -21,4 +22,5 @@ private:
     DWORD_PTR physicalMaskGroup0_ = 1;
     DWORD_PTR logicalMaskGroup0_ = 1;
     DWORD_PTR availableMaskGroup0_ = 1;
+    std::vector<std::vector<int>> coreLogicalProcessors_;
 };
