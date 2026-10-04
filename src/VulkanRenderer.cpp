@@ -445,7 +445,7 @@ void appendGear(std::vector<GearVertex>&v,std::vector<uint32_t>&ix,int teeth,flo
         V3 ni{-std::cos((a+b)*.5f),-std::sin((a+b)*.5f),0};uint32_t h0=push(hole*std::cos(a),hole*std::sin(a),-halfZ,ni.x,ni.y,0),h1=push(hole*std::cos(a),hole*std::sin(a),halfZ,ni.x,ni.y,0),h2=push(hole*std::cos(b),hole*std::sin(b),halfZ,ni.x,ni.y,0),h3=push(hole*std::cos(b),hole*std::sin(b),-halfZ,ni.x,ni.y,0);ix.insert(ix.end(),{h0,h1,h2,h0,h2,h3});
     }
 }
-std::vector<uint32_t> readSpv(const wchar_t* name){wchar_t exe[MAX_PATH]{};GetModuleFileNameW(nullptr,exe,MAX_PATH);std::wstring path(exe);auto slash=path.find_last_of(L"\\/");path=(slash==std::wstring::npos?L"":path.substr(0,slash+1))+name;std::ifstream f(path,std::ios::binary|std::ios::ate);if(!f)return{};auto n=f.tellg();std::vector<uint32_t>d((size_t(n)+3)/4);f.seekg(0);f.read((char*)d.data(),n);return d;}
+std::vector<uint32_t> readSpv(const wchar_t* name){wchar_t exe[MAX_PATH]{};GetModuleFileNameW(nullptr,exe,MAX_PATH);std::wstring path(exe);auto slash=path.find_last_of(L"\\/");path=(slash==std::wstring::npos?L"":path.substr(0,slash+1))+name;std::ifstream f(path.c_str(),std::ios::binary|std::ios::ate);if(!f)return{};auto n=f.tellg();std::vector<uint32_t>d((size_t(n)+3)/4);f.seekg(0);f.read((char*)d.data(),n);return d;}
 }
 void VulkanRenderer::destroyGearFramebuffers(){
     if(!device_)return;for(auto f:gearFramebuffers_)vkDestroyFramebuffer(device_,f,nullptr);gearFramebuffers_.clear();
