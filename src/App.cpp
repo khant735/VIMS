@@ -611,11 +611,8 @@ void App::updateRefinementLabels(){wchar_t b[80];swprintf(b,80,L"Boundary Precis
 void App::resetRefinementControls(){SendMessageW(refineEnable_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(boundarySlider_,TBM_SETPOS,TRUE,70);SendMessageW(materialSlider_,TBM_SETPOS,TRUE,65);SendMessageW(colourSlider_,TBM_SETPOS,TRUE,55);SendMessageW(radiusSlider_,TBM_SETPOS,TRUE,8);SendMessageW(fillHoles_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(removeIslands_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(protectSkin_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(refinedView_,BM_SETCHECK,BST_CHECKED,0);SendMessageW(rawView_,BM_SETCHECK,BST_UNCHECKED,0);showRaw_=false;updateRefinementLabels();}
 
 void App::setStatus(const std::wstring& s) {
-    // The detail control shows the current state; the activity box is history.
-    // Avoid duplicating long completion/result summaries in both controls.
-    const bool longSummary=s.size()>120;
-    if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL))
-        SetWindowTextW(detail,longSummary?L"Operation completed. See activity log for full results.":s.c_str());
+    // Activity/history only. Current operation/status is owned by
+    // beginOperation()/updateOperation() and IDC_OPERATION_DETAIL.
     if(HWND log=GetDlgItem(panelContent_,IDC_OPERATION_LOG)){
         SYSTEMTIME t{};GetLocalTime(&t);wchar_t stamp[32]{};swprintf(stamp,32,L"[%02u:%02u:%02u] ",t.wHour,t.wMinute,t.wSecond);
         std::wstring line=stamp+s+L"\r\n";
