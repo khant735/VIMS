@@ -17,6 +17,18 @@ $ortInclude = Split-Path -Parent $ortHeader
 $output = Join-Path $PSScriptRoot $OutputDirectory
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 $exe = Join-Path $output 'VulkanImageMaskStudio.exe'
+# Embed render-test SPIR-V so the EXE-only artifact needs no shader sidecars.
+$shaderHeader = Join-Path $PSScriptRoot 'src/CogShaders.generated.h'
+$shaderText = "#pragma once`r`n#include <cstdint>`r`n#include <cstddef>`r`n"
+foreach ($spec in @(@('cog.vert.spv','kCogVertSpv'),@('cog.frag.spv','kCogFragSpv'))) {
+    $shaderPath = Require-File (Join-Path $PSScriptRoot "src/$($spec[0])") "3D calibration shader $($spec[0])"
+    [byte[]]$bytes = [IO.File]::ReadAllBytes($shaderPath)
+    if (($bytes.Length % 4) -ne 0) { throw "Invalid SPIR-V byte length: $shaderPath" }
+    $words = for ($i=0; $i -lt $bytes.Length; $i+=4) { ('0x{0:X8}u' -f [BitConverter]::ToUInt32($bytes,$i)) }
+    $shaderText += "inline constexpr uint32_t $($spec[1])[] = {" + ($words -join ',') + "};`r`n"
+    $shaderText += "inline constexpr size_t $($spec[1])Words = sizeof($($spec[1]))/sizeof(uint32_t);`r`n"
+}
+[IO.File]::WriteAllText($shaderHeader,$shaderText,[Text.UTF8Encoding]::new($false))
 $sources = @('main','App','VulkanRenderer','RenderCalibration','SegmentationEngine','LearningStore','WicImage','CpuTopology','CompoundMask','PoseGif','CrashLog') | ForEach-Object { Join-Path $PSScriptRoot "src/$_.cpp" }
 $compilerArgs = @('-std=c++20','-O2','-Wno-macro-redefined','-DUNICODE','-D_UNICODE','-DNOMINMAX','-DWIN32_LEAN_AND_MEAN','-DVK_USE_PLATFORM_WIN32_KHR',"-I$vkInclude","-I$ortInclude") + $sources + @($vkLib,'-lcomdlg32','-lshell32','-luser32','-lgdi32','-lole32','-lwindowscodecs','-luuid','-lwinhttp','-lbcrypt','-lpdh','-lntdll','-ldxgi','-ldxguid','-lcomctl32','-municode','-mwindows','-o',$exe)
 & $compiler @compilerArgs
