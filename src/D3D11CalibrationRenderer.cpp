@@ -52,9 +52,11 @@ bool D3D11CalibrationRenderer::draw(float seconds){
     if(!identityBackend_.empty()){
         // Draw the identity as framebuffer geometry after the gears. Disable depth
         // so the HUD cannot be rejected by the scene depth buffer.
-        std::wstring label=identityBackend_+L"  "+identityGpu_;std::vector<V> tv;addTextBars(tv,label,-.94f,.88f,.022f);
+        std::wstring label=identityBackend_+L"  "+identityGpu_;std::vector<V> tv;addTextBars(tv,label,-.94f,.88f,.014f);
         if(!tv.empty()){ID3D11Buffer* tb=nullptr;D3D11_BUFFER_DESC td{};td.ByteWidth=(UINT)(tv.size()*sizeof(V));td.Usage=D3D11_USAGE_IMMUTABLE;td.BindFlags=D3D11_BIND_VERTEX_BUFFER;D3D11_SUBRESOURCE_DATA ti{tv.data()};
             if(SUCCEEDED(device_->CreateBuffer(&td,&ti,&tb))){ID3D11DepthStencilState* noDepth=nullptr;D3D11_DEPTH_STENCIL_DESC nd{};nd.DepthEnable=FALSE;nd.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ZERO;nd.DepthFunc=D3D11_COMPARISON_ALWAYS;device_->CreateDepthStencilState(&nd,&noDepth);context_->OMSetDepthStencilState(noDepth,0);
+                // The scene vertex shader uses mul(rowVector, matrix), so put clip-space
+                // identity on the constant buffer in the same layout as the scene.
                 UINT ts=sizeof(V),to=0;context_->IASetVertexBuffers(0,1,&tb,&ts,&to);C id{{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE tm{};if(SUCCEEDED(context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&tm))){memcpy(tm.pData,&id,sizeof(id));context_->Unmap(cb_,0);context_->Draw((UINT)tv.size(),0);}context_->OMSetDepthStencilState(nullptr,0);if(noDepth)noDepth->Release();tb->Release();}
         }
     }
