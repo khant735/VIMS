@@ -4,6 +4,7 @@
 #include <dxgi.h>
 #include <cmath>
 #include <cstring>
+#include <vector>
 
 struct V { float x,y,z,r,g,b; };
 struct C { float m[16]; };
@@ -24,13 +25,21 @@ bool D3D11CalibrationRenderer::initialize(HWND hwnd,std::wstring& error){
     ID3DBlob *v=nullptr,*p=nullptr,*e=nullptr;if(FAILED(D3DCompile(shader,strlen(shader),nullptr,nullptr,nullptr,"vs","vs_4_0",0,0,&v,&e))||FAILED(D3DCompile(shader,strlen(shader),nullptr,nullptr,nullptr,"ps","ps_4_0",0,0,&p,&e))){if(e)e->Release();error=L"Direct3D shader compilation failed.";shutdown();return false;}
     device_->CreateVertexShader(v->GetBufferPointer(),v->GetBufferSize(),nullptr,&vs_);device_->CreatePixelShader(p->GetBufferPointer(),p->GetBufferSize(),nullptr,&ps_);
     D3D11_INPUT_ELEMENT_DESC il[]={{"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},{"COLOR",0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0}};device_->CreateInputLayout(il,2,v->GetBufferPointer(),v->GetBufferSize(),&layout_);v->Release();p->Release();if(e)e->Release();
-    V verts[]={{-.8f,-.6f,.2f,.72f,.12f,.06f},{0,.85f,.2f,.72f,.12f,.06f},{.8f,-.6f,.2f,.72f,.12f,.06f},{-.45f,-.35f,0,.08f,.25f,.85f},{0,.45f,0,.08f,.25f,.85f},{.45f,-.35f,0,.08f,.25f,.85f}};
-    D3D11_BUFFER_DESC bd{};bd.ByteWidth=sizeof(verts);bd.Usage=D3D11_USAGE_IMMUTABLE;bd.BindFlags=D3D11_BIND_VERTEX_BUFFER;D3D11_SUBRESOURCE_DATA init{verts};device_->CreateBuffer(&bd,&init,&vb_);bd.ByteWidth=sizeof(C);bd.Usage=D3D11_USAGE_DYNAMIC;bd.BindFlags=D3D11_BIND_CONSTANT_BUFFER;bd.CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;device_->CreateBuffer(&bd,nullptr,&cb_);return true;
+    std::vector<V> verts;
+    auto gear=[&](float cx,float cy,float radius,int teeth,float rr,float gg,float bb){
+        const int seg=teeth*2;const float inner=radius*.78f;
+        for(int i=0;i<seg;++i){float a0=6.2831853f*i/seg,a1=6.2831853f*(i+1)/seg;float r0=(i&1)?inner:radius,r1=((i+1)&1)?inner:radius;
+            verts.push_back({cx,cy,.10f,rr,gg,bb});verts.push_back({cx+cosf(a0)*r0,cy+sinf(a0)*r0,.10f,rr,gg,bb});verts.push_back({cx+cosf(a1)*r1,cy+sinf(a1)*r1,.10f,rr,gg,bb});}
+    };
+    auto disc=[&](float cx,float cy,float radius,float rr,float gg,float bb){for(int i=0;i<32;++i){float a0=6.2831853f*i/32,a1=6.2831853f*(i+1)/32;verts.push_back({cx,cy,.05f,rr,gg,bb});verts.push_back({cx+cosf(a0)*radius,cy+sinf(a0)*radius,.05f,rr,gg,bb});verts.push_back({cx+cosf(a1)*radius,cy+sinf(a1)*radius,.05f,rr,gg,bb});}};
+    gear(-.38f,.02f,.48f,16,.72f,.10f,.045f);disc(-.38f,.02f,.14f,.72f,.74f,.77f);
+    gear(.48f,.02f,.32f,8,.045f,.20f,.78f);disc(.48f,.02f,.10f,.72f,.74f,.77f);
+    D3D11_BUFFER_DESC bd{};bd.ByteWidth=(UINT)(verts.size()*sizeof(V));bd.Usage=D3D11_USAGE_IMMUTABLE;bd.BindFlags=D3D11_BIND_VERTEX_BUFFER;D3D11_SUBRESOURCE_DATA init{verts.data()};device_->CreateBuffer(&bd,&init,&vb_);bd.ByteWidth=sizeof(C);bd.Usage=D3D11_USAGE_DYNAMIC;bd.BindFlags=D3D11_BIND_CONSTANT_BUFFER;bd.CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;device_->CreateBuffer(&bd,nullptr,&cb_);return true;
 }
 bool D3D11CalibrationRenderer::draw(float seconds){
     if(!device_)return false;RECT r{};GetClientRect(hwnd_,&r);if(r.right<=0||r.bottom<=0)return false;float clear[]={.025f,.035f,.055f,1};context_->OMSetRenderTargets(1,&rtv_,dsv_);context_->ClearRenderTargetView(rtv_,clear);context_->ClearDepthStencilView(dsv_,D3D11_CLEAR_DEPTH,1,0);
     D3D11_VIEWPORT vp{0,0,(float)r.right,(float)r.bottom,0,1};context_->RSSetViewports(1,&vp);UINT stride=sizeof(V),off=0;context_->IASetVertexBuffers(0,1,&vb_,&stride,&off);context_->IASetInputLayout(layout_);context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);context_->VSSetShader(vs_,nullptr,0);context_->PSSetShader(ps_,nullptr,0);
-    float c=cosf(seconds),s=sinf(seconds);C x{{c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE map{};context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&map);memcpy(map.pData,&x,sizeof(x));context_->Unmap(cb_,0);context_->VSSetConstantBuffers(0,1,&cb_);context_->Draw(6,0);return SUCCEEDED(swap_->Present(1,0));
+    float c=cosf(seconds),s=sinf(seconds);C x{{c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE map{};context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&map);memcpy(map.pData,&x,sizeof(x));context_->Unmap(cb_,0);context_->VSSetConstantBuffers(0,1,&cb_);context_->Draw(216,0);return SUCCEEDED(swap_->Present(1,0));
 }
 void D3D11CalibrationRenderer::shutdown(){if(context_)context_->ClearState();IUnknown* p=nullptr;
 #define R(x) p=(IUnknown*)x;rel(p);x=nullptr
