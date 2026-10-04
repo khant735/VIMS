@@ -13,6 +13,9 @@ public:
     void shutdown();
     void setImage(const ImageRGBA& rgba);
     void draw();
+    // Real Vulkan graphics-pipeline calibration scene: two extruded 3D gears,
+    // depth testing, directional lighting and an orbiting perspective camera.
+    bool drawGearCalibration(float seconds);
     void resized();
     bool ready() const { return device_ != VK_NULL_HANDLE; }
     const char* gpuName() const { return gpuName_; }
@@ -38,6 +41,20 @@ private:
     VkDeviceMemory textureMemory_ = VK_NULL_HANDLE;
     uint32_t textureW_ = 0, textureH_ = 0;
     bool resizePending_ = false;
+
+    VkRenderPass gearRenderPass_ = VK_NULL_HANDLE;
+    VkPipelineLayout gearPipelineLayout_ = VK_NULL_HANDLE;
+    VkPipeline gearPipeline_ = VK_NULL_HANDLE;
+    std::vector<VkFramebuffer> gearFramebuffers_;
+    VkImage gearDepth_ = VK_NULL_HANDLE;
+    VkDeviceMemory gearDepthMemory_ = VK_NULL_HANDLE;
+    VkImageView gearDepthView_ = VK_NULL_HANDLE;
+    VkBuffer gearVertexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory gearVertexMemory_ = VK_NULL_HANDLE;
+    VkBuffer gearIndexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory gearIndexMemory_ = VK_NULL_HANDLE;
+    uint32_t gearIndexCount_ = 0;
+    VkFormat gearDepthFormat_ = VK_FORMAT_UNDEFINED;
     char gpuName_[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE]{};
 
     void createInstance();
@@ -47,6 +64,10 @@ private:
     void destroySwapchain();
     void createCommandResources();
     void destroyTexture();
+    void createGearResources();
+    void destroyGearResources();
+    void createGearFramebuffers();
+    void destroyGearFramebuffers();
     uint32_t findMemoryType(uint32_t typeBits, VkMemoryPropertyFlags flags) const;
     VkCommandBuffer beginOneTime();
     void endOneTime(VkCommandBuffer cmd);
