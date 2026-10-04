@@ -609,9 +609,33 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
         else if (id == IDC_OPEN && code == BN_CLICKED) openImage();
         else if (id == IDC_ANALYSE && code == BN_CLICKED) analyse();
         else if (id == IDC_GPU_SELFTEST && code == BN_CLICKED){
+            // Ask for the calibration target before touching the renderer.  The
+            // selected dimensions are also reported so results from different
+            // machines/backends remain comparable.
+            static const struct { const wchar_t* name; int w,h; } modes[]={
+                {L"240p (426 x 240)",426,240},{L"360p (640 x 360)",640,360},
+                {L"480p (854 x 480)",854,480},{L"576p (1024 x 576)",1024,576},
+                {L"720p HD (1280 x 720)",1280,720},{L"1080p Full HD (1920 x 1080)",1920,1080},
+                {L"1440p QHD (2560 x 1440)",2560,1440},{L"2160p / 4K (3840 x 2160)",3840,2160},
+                {L"4320p / 8K (7680 x 4320)",7680,4320},{L"8640p / 16K (15360 x 8640)",15360,8640}
+            };
+            int chosen=-1;
+            // Compact modal chooser implemented with the standard Win32 popup
+            // menu, avoiding a second permanent settings panel.
+            HMENU resolutionMenu=CreatePopupMenu();
+            if(!resolutionMenu){setStatus(L"Could not create resolution selector.");return 0;}
+            for(unsigned i=0;i<sizeof(modes)/sizeof(modes[0]);++i)AppendMenuW(resolutionMenu,MF_STRING,50000+i,modes[i].name);
+            POINT pt{};GetCursorPos(&pt);
+            const UINT pick=TrackPopupMenu(resolutionMenu,TPM_RETURNCMD|TPM_NONOTIFY|TPM_LEFTALIGN|TPM_TOPALIGN,pt.x,pt.y,0,hwnd_,nullptr);
+            DestroyMenu(resolutionMenu);
+            if(pick>=50000&&pick<50000+sizeof(modes)/sizeof(modes[0]))chosen=int(pick-50000);
+            if(chosen<0)return 0;
+            const int targetW=modes[chosen].w,targetH=modes[chosen].h;
             const auto adapters=queryGpuAdapters();
             LUID active{};const bool hasActive=vulkanReady_&&renderer_.gpuLuid(active);
             std::wstringstream report;report<<L"VIMS Render Test / Calibration\r\n\r\n";
+            report<<L"Target resolution: "<<modes[chosen].name<<L"\r\n";
+            report<<L"Requested framebuffer: "<<targetW<<L" x "<<targetH<<L"\r\n\r\n";
             if(adapters.empty()) report<<L"No hardware GPU is exposed to Windows/DXGI. A firmware-disabled or driver-disabled iGPU cannot be render-tested.\r\n";
             for(size_t i=0;i<adapters.size();++i){
                 const auto& g=adapters[i];const bool selected=hasActive&&g.luid.HighPart==active.HighPart&&g.luid.LowPart==active.LowPart;
