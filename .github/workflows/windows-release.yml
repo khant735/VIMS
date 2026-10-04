@@ -72,6 +72,19 @@ jobs:
           New-Item -ItemType Directory -Force -Path build\Release | Out-Null
           Copy-Item src\cog.vert.spv,src\cog.frag.spv build\Release -Force
 
+      - name: Publish current calibration shaders
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path runtime-shaders | Out-Null
+          Copy-Item src\cog.vert.spv,src\cog.frag.spv runtime-shaders -Force
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add runtime-shaders/cog.vert.spv runtime-shaders/cog.frag.spv
+          if (-not (git diff --cached --quiet)) {
+            git commit -m "Update compiled Vulkan calibration shaders [skip ci]"
+            git push origin HEAD:main
+          }
+
       - name: Build
         shell: pwsh
         run: .\build.ps1
