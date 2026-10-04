@@ -36,14 +36,18 @@ CpuTopology::CpuTopology() {
         if (info->Relationship == RelationProcessorCore) {
             ++physicalCores_;
             const auto& proc = info->Processor;
+            std::vector<int> coreLogical;
             for (WORD i = 0; i < proc.GroupCount; ++i) {
                 const auto& ga = proc.GroupMask[i];
                 logicalProcessors_ += static_cast<int>(std::popcount(static_cast<unsigned long long>(ga.Mask)));
                 if (ga.Group == 0) {
                     logicalMaskGroup0_ |= ga.Mask;
                     physicalMaskGroup0_ |= lowestBit(ga.Mask);
+                    for(int bit=0;bit<int(sizeof(DWORD_PTR)*8);++bit)
+                        if(ga.Mask&(DWORD_PTR(1)<<bit)) coreLogical.push_back(bit);
                 }
             }
+            coreLogicalProcessors_.push_back(std::move(coreLogical));
         }
         offset += info->Size;
     }
