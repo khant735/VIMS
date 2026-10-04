@@ -2,15 +2,9 @@
 layout(location=0) in vec3 n;
 layout(location=1) in vec3 p;
 layout(location=2) in vec2 uv;
-layout(set=0,binding=0) uniform sampler2D materialAtlas;
+layout(set=0,binding=0) uniform sampler2D materialTexture;
 layout(location=0) out vec4 outColor;
 layout(push_constant) uniform PC { mat4 mvp; mat4 model; vec4 material; } pc;
-
-vec3 sampleMaterial(int m, vec2 tc){
-    vec2 tiled=fract(tc);
-    float u=(float(m)+tiled.x)/3.0;
-    return texture(materialAtlas,vec2(u,tiled.y)).rgb;
-}
 
 void main(){
     int m=clamp(int(pc.material.w+0.5),0,2);
@@ -24,7 +18,7 @@ void main(){
 
     // All visible surface detail now comes from a real packaged image:
     // 0=cog_wood.ppm, 1=cog_resin.ppm, 2=spindle_metal.ppm.
-    vec3 texel=sampleMaterial(m,uv*(m==0?2.0:(m==1?1.5:4.0)));
+    vec3 texel=texture(materialTexture,fract(uv*(m==0?2.0:(m==1?1.5:4.0)))).rgb;
     vec3 base=texel;
     float spec;
     vec3 specColor;
