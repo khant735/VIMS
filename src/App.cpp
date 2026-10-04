@@ -320,14 +320,23 @@ void App::layout() {
     // Use the otherwise empty preview toolbar for the primary/open and
     // maintenance actions. These controls are reparented here so they remain
     // visible above the Vulkan surface instead of consuming the right panel.
-    const int topButtonH=S(30), topGap=S(8);
-    int topX=S(196);
-    const int openW=S(120), renderW=S(190), diagW=S(150), gifW=S(185);
+    const int topButtonH=S(24), topGap=S(6);
+    int topX=S(188);
     SetParent(openBtn_,hwnd_);SetParent(gpuSelfTestBtn_,hwnd_);SetParent(diagnosticsBtn_,hwnd_);SetParent(poseGifBtn_,hwnd_);
-    MoveWindow(openBtn_,topX,S(9),openW,topButtonH,TRUE); topX+=openW+topGap;
-    MoveWindow(gpuSelfTestBtn_,topX,S(9),renderW,topButtonH,TRUE); topX+=renderW+topGap;
-    MoveWindow(diagnosticsBtn_,topX,S(9),diagW,topButtonH,TRUE); topX+=diagW+topGap;
-    MoveWindow(poseGifBtn_,topX,S(9),gifW,topButtonH,TRUE);
+    auto fitToolbarButton=[&](HWND button){
+        wchar_t label[256]{};GetWindowTextW(button,label,256);
+        HDC dc=GetDC(button);HFONT font=(HFONT)SendMessageW(button,WM_GETFONT,0,0),oldFont=nullptr;
+        if(font)oldFont=(HFONT)SelectObject(dc,font);
+        SIZE textSize{};GetTextExtentPoint32W(dc,label,lstrlenW(label),&textSize);
+        if(oldFont)SelectObject(dc,oldFont);ReleaseDC(button,dc);
+        const int bw=std::max(S(34),static_cast<int>(textSize.cx)+S(16));
+        MoveWindow(button,topX,S(10),bw,topButtonH,TRUE);
+        topX+=bw+topGap;
+    };
+    fitToolbarButton(openBtn_);
+    fitToolbarButton(gpuSelfTestBtn_);
+    fitToolbarButton(diagnosticsBtn_);
+    fitToolbarButton(poseGifBtn_);
 
     RECT existingPanel{};GetWindowRect(rightPanel_,&existingPanel);
     if(existingPanel.right-existingPanel.left!=cw-vw||existingPanel.bottom-existingPanel.top!=ch)
