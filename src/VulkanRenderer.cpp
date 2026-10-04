@@ -157,8 +157,9 @@ void VulkanRenderer::createSwapchain() {
 
     VkSurfaceCapabilitiesKHR caps{};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_, surface_, &caps);
-    if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT))
-        throw std::runtime_error("This Vulkan surface does not support transfer-destination swapchain images.");
+    const VkImageUsageFlags requiredUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    if ((caps.supportedUsageFlags & requiredUsage) != requiredUsage)
+        throw std::runtime_error("This Vulkan surface does not support transfer-destination + color-attachment swapchain images.");
 
     uint32_t fmtCount = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &fmtCount, nullptr);
@@ -188,7 +189,7 @@ void VulkanRenderer::createSwapchain() {
     ci.imageColorSpace = chosen.colorSpace;
     ci.imageExtent = extent_;
     ci.imageArrayLayers = 1;
-    ci.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    ci.imageUsage = requiredUsage;
     ci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     ci.preTransform = caps.currentTransform;
     if (caps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
@@ -449,6 +450,7 @@ std::vector<uint32_t> readSpv(const wchar_t* name){wchar_t exe[MAX_PATH]{};GetMo
 }
 void VulkanRenderer::destroyGearFramebuffers(){
     if(!device_)return;for(auto f:gearFramebuffers_)vkDestroyFramebuffer(device_,f,nullptr);gearFramebuffers_.clear();
+    for(auto v:gearColorViews_)vkDestroyImageView(device_,v,nullptr);gearColorViews_.clear();
     if(gearDepthView_)vkDestroyImageView(device_,gearDepthView_,nullptr);if(gearDepth_)vkDestroyImage(device_,gearDepth_,nullptr);if(gearDepthMemory_)vkFreeMemory(device_,gearDepthMemory_,nullptr);
     gearDepthView_=VK_NULL_HANDLE;gearDepth_=VK_NULL_HANDLE;gearDepthMemory_=VK_NULL_HANDLE;
 }
@@ -458,7 +460,7 @@ void VulkanRenderer::createGearFramebuffers(){
     VkImageCreateInfo di{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};di.imageType=VK_IMAGE_TYPE_2D;di.format=gearDepthFormat_;di.extent={extent_.width,extent_.height,1};di.mipLevels=1;di.arrayLayers=1;di.samples=VK_SAMPLE_COUNT_1_BIT;di.tiling=VK_IMAGE_TILING_OPTIMAL;di.usage=VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;di.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
     vkCheck(vkCreateImage(device_,&di,nullptr,&gearDepth_),"Could not create gear depth image.");VkMemoryRequirements mr{};vkGetImageMemoryRequirements(device_,gearDepth_,&mr);VkMemoryAllocateInfo ma{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};ma.allocationSize=mr.size;ma.memoryTypeIndex=findMemoryType(mr.memoryTypeBits,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);vkCheck(vkAllocateMemory(device_,&ma,nullptr,&gearDepthMemory_),"Could not allocate gear depth memory.");vkBindImageMemory(device_,gearDepth_,gearDepthMemory_,0);
     VkImageViewCreateInfo dv{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};dv.image=gearDepth_;dv.viewType=VK_IMAGE_VIEW_TYPE_2D;dv.format=gearDepthFormat_;dv.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT;dv.subresourceRange.levelCount=1;dv.subresourceRange.layerCount=1;vkCheck(vkCreateImageView(device_,&dv,nullptr,&gearDepthView_),"Could not create gear depth view.");
-    for(auto image:swapImages_){VkImageView view{};VkImageViewCreateInfo vi{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};vi.image=image;vi.viewType=VK_IMAGE_VIEW_TYPE_2D;vi.format=swapFormat_;vi.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;vi.subresourceRange.levelCount=1;vi.subresourceRange.layerCount=1;vkCheck(vkCreateImageView(device_,&vi,nullptr,&view),"Could not create swap image view.");VkImageView at[]={view,gearDepthView_};VkFramebufferCreateInfo fi{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};fi.renderPass=gearRenderPass_;fi.attachmentCount=2;fi.pAttachments=at;fi.width=extent_.width;fi.height=extent_.height;fi.layers=1;VkFramebuffer fb{};vkCheck(vkCreateFramebuffer(device_,&fi,nullptr,&fb),"Could not create gear framebuffer.");gearFramebuffers_.push_back(fb);vkDestroyImageView(device_,view,nullptr);}
+    for(auto image:swapImages_){VkImageView view{};VkImageViewCreateInfo vi{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};vi.image=image;vi.viewType=VK_IMAGE_VIEW_TYPE_2D;vi.format=swapFormat_;vi.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;vi.subresourceRange.levelCount=1;vi.subresourceRange.layerCount=1;vkCheck(vkCreateImageView(device_,&vi,nullptr,&view),"Could not create swap image view.");VkImageView at[]={view,gearDepthView_};VkFramebufferCreateInfo fi{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};fi.renderPass=gearRenderPass_;fi.attachmentCount=2;fi.pAttachments=at;fi.width=extent_.width;fi.height=extent_.height;fi.layers=1;VkFramebuffer fb{};vkCheck(vkCreateFramebuffer(device_,&fi,nullptr,&fb),"Could not create gear framebuffer.");gearFramebuffers_.push_back(fb);gearColorViews_.push_back(view);}
 }
 void VulkanRenderer::destroyGearResources(){
     if(!device_)return;destroyGearFramebuffers();if(gearPipeline_)vkDestroyPipeline(device_,gearPipeline_,nullptr);if(gearPipelineLayout_)vkDestroyPipelineLayout(device_,gearPipelineLayout_,nullptr);if(gearRenderPass_)vkDestroyRenderPass(device_,gearRenderPass_,nullptr);if(gearVertexBuffer_)vkDestroyBuffer(device_,gearVertexBuffer_,nullptr);if(gearVertexMemory_)vkFreeMemory(device_,gearVertexMemory_,nullptr);if(gearIndexBuffer_)vkDestroyBuffer(device_,gearIndexBuffer_,nullptr);if(gearIndexMemory_)vkFreeMemory(device_,gearIndexMemory_,nullptr);
