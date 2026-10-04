@@ -15,7 +15,7 @@ public:
     void draw();
     // Real Vulkan graphics-pipeline calibration scene: two extruded 3D gears,
     // depth testing, directional lighting and an orbiting perspective camera.
-    bool drawGearCalibration(float seconds);
+    bool drawGearCalibration(float seconds, uint32_t targetWidth=0, uint32_t targetHeight=0);
     void resized();
     bool ready() const { return device_ != VK_NULL_HANDLE; }
     const char* gpuName() const { return gpuName_; }
@@ -64,6 +64,7 @@ private:
     uint32_t gearSmallSpindleFirstIndex_ = 0;
     uint32_t gearSmallSpindleIndexCount_ = 0;
     VkFormat gearDepthFormat_ = VK_FORMAT_UNDEFINED;
+    VkExtent2D gearTargetExtent_{};
     char gpuName_[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE]{};
 
     void createInstance();
