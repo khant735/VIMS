@@ -689,7 +689,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     if(frames) report<<L"  Presented/display rate: "<<std::fixed<<std::setprecision(1)<<presentedFps<<L" frames/s (VSync/presentation)\r\n";
                     else report<<L"  Presented/display rate: UNAVAILABLE\r\n";
                 }else report<<L"  Vulkan device/render: not tested (renderer currently bound to another adapter)\r\n";
-                report<<L"  DirectML per-adapter compute: pending scheduler implementation\\r\\n";
+                report<<L"  DirectML per-adapter compute: pending scheduler implementation\r\n";
                 if(i==0){
                     D3D11CalibrationRenderer d3d;
                     std::wstring d3dError;
