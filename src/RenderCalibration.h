@@ -61,6 +61,14 @@ struct CalibrationBackendInfo {
     bool theoreticalProbeOnly;
 };
 const std::vector<CalibrationBackendInfo>& calibrationBackends();
+struct CalibrationTextureProfile {
+    const wchar_t* format;
+    uint32_t maxDimension;
+    uint32_t budgetKiB;
+    bool blockCompressed;
+};
+CalibrationTextureProfile calibrationTextureProfile(CalibrationBackend backend);
+
 
 enum class CalibrationResultKind { RenderPass, RenderFail, TheoreticalCompatible, TranslationRequired, TheoreticalIncompatible, Unavailable };
 struct CalibrationResult {
