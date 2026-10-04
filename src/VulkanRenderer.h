@@ -72,6 +72,10 @@ private:
     uint32_t gearSmallSpindleIndexCount_ = 0;
     VkFormat gearDepthFormat_ = VK_FORMAT_UNDEFINED;
     VkExtent2D gearTargetExtent_{};
+    VkImage gearOffscreenColor_ = VK_NULL_HANDLE;
+    VkDeviceMemory gearOffscreenColorMemory_ = VK_NULL_HANDLE;
+    VkImageView gearOffscreenColorView_ = VK_NULL_HANDLE;
+    VkFramebuffer gearOffscreenFramebuffer_ = VK_NULL_HANDLE;
     char gpuName_[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE]{};
 
     void createInstance();
