@@ -1527,7 +1527,7 @@ void App::downloadFaceModel() {
         auto runScript = [this,&st](const std::filesystem::path& script,const std::filesystem::path& log) -> bool {
             if(st.stop_requested()) return false;
             std::wstring cmd=L"& { & '" + script.wstring() + L"' *>&1 | Tee-Object -FilePath '" + log.wstring() + L"'; exit $LASTEXITCODE }";
-            std::wstring args=L"-NoProfile -ExecutionPolicy Bypass -Command \\"" + cmd + L"\\\"";
+            std::wstring args=L"-NoProfile -ExecutionPolicy Bypass -Command \"" + cmd + L"\"";
             SHELLEXECUTEINFOW sei{sizeof(sei)}; sei.fMask=SEE_MASK_NOCLOSEPROCESS;
             sei.lpVerb=L"open"; sei.lpFile=L"powershell.exe"; sei.lpParameters=args.c_str();
             const auto cwd=exeDir().wstring(); sei.lpDirectory=cwd.c_str(); sei.nShow=SW_SHOWNORMAL;
