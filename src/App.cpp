@@ -664,7 +664,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     const ULONGLONG start=GetTickCount64();unsigned frames=0;
                     while(GetTickCount64()-start<6000){
                         const float t=float(GetTickCount64()-start)/1000.0f;
-                        if(renderer_.drawGearCalibration(t))++frames;
+                        if(renderer_.drawGearCalibration(t,(uint32_t)targetW,(uint32_t)targetH))++frames;
                         MSG msg{};
                         while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){
                             if(msg.hwnd==view_&&(msg.message==WM_PAINT||msg.message==WM_ERASEBKGND)){
