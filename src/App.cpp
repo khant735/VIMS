@@ -357,7 +357,21 @@ void App::layout() {
                 SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW);
     };
     int x=pad,y=pad,w=available;
-    const int row=S(24), btn=S(30), labelW=std::clamp(int(w*.48),S(175),S(245));
+    const int row=S(24), btn=S(24), labelW=std::clamp(int(w*.48),S(175),S(245));
+    auto buttonWidth=[&](HWND button,int extra=S(16)){
+        if(!button||!IsWindow(button))return S(34);
+        wchar_t label[512]{};GetWindowTextW(button,label,512);
+        HDC dc=GetDC(button);HFONT font=(HFONT)SendMessageW(button,WM_GETFONT,0,0),oldFont=nullptr;
+        if(font)oldFont=(HFONT)SelectObject(dc,font);
+        SIZE size{};GetTextExtentPoint32W(dc,label,lstrlenW(label),&size);
+        if(oldFont)SelectObject(dc,oldFont);ReleaseDC(button,dc);
+        return std::min(w,std::max(S(34),static_cast<int>(size.cx)+extra));
+    };
+    auto placeButton=[&](HWND button,int xx,int yy,int maxW=w){
+        const int bw=std::min(maxW,buttonWidth(button));
+        place(button,xx,yy,bw,btn);
+        return bw;
+    };
 
     // Keep the active operation together as one compact status panel:
     // title -> progress -> details -> activity -> hardware. This mirrors the
@@ -385,7 +399,7 @@ void App::layout() {
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
     // Open/Render Test/Diagnostics live in the top preview toolbar.
     // Keep Analyse in the workflow panel where it belongs.
-    place(analyseBtn_,x,y,w,btn);y+=S(36);
+    placeButton(analyseBtn_,x,y);y+=S(30);
 
     const int groupH=S(300);
     place(refineGroup_,x,y,w,S(20));
@@ -410,21 +424,21 @@ void App::layout() {
     place(resetRefine_,resetX,gy-S(2),std::max(S(100),x+w-pad-resetX),S(26));
     y+=groupH+S(6);
 
-    place(faceModelBtn_,x,y,w,btn); y+=S(33);
+    placeButton(faceModelBtn_,x,y); y+=S(29);
     place(faceModelStatus_,x,y,w,S(34)); y+=S(38);
     place(maskLabel_,x,y,w,S(20)); y+=S(22);
 
     int listH=S(200);
     place(maskList_,x,y,w,listH); y+=listH+S(4);
-    place(guideBtn_,x,y,w,S(26));y+=S(30);
-    place(applyGuideBtn_,x,y,(w-gap)/2,S(26));
-    place(resetGuideBtn_,x+(w+gap)/2,y,(w-gap)/2,S(26));y+=S(30);
-    place(createPartBtn_,x,y,w,S(26));y+=S(30);
-    place(approveBtn_,x,y,w,S(26));y+=S(30);
+    placeButton(guideBtn_,x,y);y+=S(29);
+    const int applyW=placeButton(applyGuideBtn_,x,y);
+    placeButton(resetGuideBtn_,x+applyW+gap,y);y+=S(29);
+    placeButton(createPartBtn_,x,y);y+=S(29);
+    placeButton(approveBtn_,x,y);y+=S(29);
     place(boundaryCheck_,x,y,w,S(22)); y+=S(24);
     place(cutoutCheck_,x,y,w,S(22)); y+=S(24);
-    place(exportBtn_,x,y,w,btn);y+=S(34);
-    place(exportAllBtn_,x,y,w,btn);y+=S(34);
+    placeButton(exportBtn_,x,y);y+=S(29);
+    placeButton(exportAllBtn_,x,y);y+=S(29);
     // Pose GIF export lives in the top preview toolbar.
     panelContentHeight_=y+pad;
     panelScroll_=std::clamp(panelScroll_,0,std::max(0,panelContentHeight_-ch));
