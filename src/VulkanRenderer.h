@@ -46,6 +46,13 @@ private:
     VkRenderPass gearRenderPass_ = VK_NULL_HANDLE;
     VkPipelineLayout gearPipelineLayout_ = VK_NULL_HANDLE;
     VkPipeline gearPipeline_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout gearDescriptorSetLayout_ = VK_NULL_HANDLE;
+    VkDescriptorPool gearDescriptorPool_ = VK_NULL_HANDLE;
+    VkDescriptorSet gearDescriptorSet_ = VK_NULL_HANDLE;
+    VkImage gearTexture_ = VK_NULL_HANDLE;
+    VkDeviceMemory gearTextureMemory_ = VK_NULL_HANDLE;
+    VkImageView gearTextureView_ = VK_NULL_HANDLE;
+    VkSampler gearTextureSampler_ = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> gearFramebuffers_;
     std::vector<VkImageView> gearColorViews_;
     VkImage gearDepth_ = VK_NULL_HANDLE;
