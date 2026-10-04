@@ -94,12 +94,14 @@ jobs:
         run: |
           $out = 'build\Release'
           Copy-Item $env:DIRECTML_DLL $out -Force
-          Copy-Item assets\cog_metal.ppm $out -Force
+          Copy-Item assets\cog_wood.ppm,assets\cog_resin.ppm,assets\spindle_metal.ppm $out -Force
           $required = @(
             "$out\VulkanImageMaskStudio.exe",
             "$out\cog.vert.spv",
             "$out\cog.frag.spv",
-            "$out\cog_metal.ppm",
+            "$out\cog_wood.ppm",
+            "$out\cog_resin.ppm",
+            "$out\spindle_metal.ppm",
             "$out\libc++.dll",
             "$out\libunwind.dll",
             "$out\onnxruntime.dll",
