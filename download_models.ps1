@@ -22,6 +22,27 @@ $models=@(
  (Model "Animal Pose AP-10K" "animal_pose_ap10k.onnx" "https://huggingface.co/hr16/UnJIT-DWPose/resolve/main/rtmpose-m_ap10k_256.onnx?download=true" 1000000 "Experimental" "1cfd1c86e0d9e5d5f95178bcd95ee9a4e8386a624cd3c57519f27ff58cac7f28")
  (Model "Fingernail Instance Segmentation" "fingernail_segmentation.onnx" "https://raw.githubusercontent.com/austingg/finger-nail-seg/main/models/nail-seg.onnx" 100000 "Experimental")
 )
+# Keep the Vulkan calibration shaders in sync when the in-app model
+# downloader is used.  They are small runtime assets, so fetch them beside the
+# executable rather than making the user update them manually.
+$shaderFailures=0
+$shaderAssets=@(
+ [PSCustomObject]@{Name="Vulkan gear vertex shader";File="cog.vert.spv";Url="https://raw.githubusercontent.com/khant735/VIMS/main/runtime-shaders/cog.vert.spv"}
+ [PSCustomObject]@{Name="Vulkan gear fragment shader";File="cog.frag.spv";Url="https://raw.githubusercontent.com/khant735/VIMS/main/runtime-shaders/cog.frag.spv"}
+)
+foreach($s in $shaderAssets){
+ $dst=Join-Path $PSScriptRoot $s.File;$part="$dst.part"
+ try{
+  Write-Host "[download] $($s.Name)";Invoke-WebRequest -Uri $s.Url -OutFile $part -UseBasicParsing -MaximumRedirection 10
+  if((Get-Item $part).Length-lt 20){throw "Downloaded shader is unexpectedly small."}
+  Move-Item $part $dst -Force
+  $x="[ok] $($s.Name)";Write-Host $x;Add-Content $report $x
+ }catch{
+  Remove-Item $part -Force -ErrorAction SilentlyContinue
+  $shaderFailures++;$x="[failed] $($s.Name): $($_.Exception.Message)";Write-Warning $x;Add-Content $report $x
+ }
+}
+
 $coreFailures=0;$optionalFailures=0
 foreach($m in $models){
  if($m.Group-eq"Experimental" -and !$IncludeExperimental){continue}
@@ -45,5 +66,7 @@ foreach($m in $models){
   if($m.Group-eq"Core"){$coreFailures++}else{$optionalFailures++}
  }
 }
-Add-Content $report "Core failures: $coreFailures; Optional failures: $optionalFailures"
-if($coreFailures-gt 0){exit 10};exit 0
+Add-Content $report "Core failures: $coreFailures; Optional failures: $optionalFailures; Shader failures: $shaderFailures"
+if($coreFailures-gt 0){exit 10}
+if($shaderFailures-gt 0){exit 11}
+exit 0
