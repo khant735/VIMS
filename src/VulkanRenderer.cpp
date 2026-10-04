@@ -3,6 +3,9 @@
 #include <cstring>
 #include <stdexcept>
 #include <vector>
+#include <array>
+#include <cmath>
+#include <fstream>
 
 static void vkCheck(VkResult r, const char* what) {
     if (r != VK_SUCCESS) throw std::runtime_error(what);
@@ -34,12 +37,14 @@ void VulkanRenderer::initialize(HWND hwnd) {
     createDevice();
     createCommandResources();
     createSwapchain();
+    createGearResources();
 }
 
 void VulkanRenderer::shutdown() {
     if (!instance_) return;
     if (device_) vkDeviceWaitIdle(device_);
     destroyTexture();
+    destroyGearResources();
     destroySwapchain();
     if (device_) {
         if (imageAvailable_) vkDestroySemaphore(device_, imageAvailable_, nullptr);
@@ -203,9 +208,11 @@ void VulkanRenderer::createSwapchain() {
     swapImages_.resize(n);
     vkGetSwapchainImagesKHR(device_, swapchain_, &n, swapImages_.data());
     resizePending_ = false;
+    if(gearRenderPass_) createGearFramebuffers();
 }
 
 void VulkanRenderer::destroySwapchain() {
+    destroyGearFramebuffers();
     swapImages_.clear();
     if (device_ && swapchain_) vkDestroySwapchainKHR(device_, swapchain_, nullptr);
     swapchain_ = VK_NULL_HANDLE;
@@ -409,4 +416,70 @@ void VulkanRenderer::draw() {
     vkQueueWaitIdle(queue_);
     vkFreeCommandBuffers(device_, commandPool_, 1, &cmd);
     if (pr == VK_ERROR_OUT_OF_DATE_KHR || pr == VK_SUBOPTIMAL_KHR) resized();
+}
+
+
+namespace {
+struct GearVertex { float p[3]; float n[3]; };
+struct Mat4 { float m[16]{}; };
+Mat4 ident(){Mat4 r{};r.m[0]=r.m[5]=r.m[10]=r.m[15]=1;return r;}
+Mat4 mul(const Mat4&a,const Mat4&b){Mat4 r{};for(int col=0;col<4;++col)for(int row=0;row<4;++row)for(int k=0;k<4;++k)r.m[col*4+row]+=a.m[k*4+row]*b.m[col*4+k];return r;}
+Mat4 translate(float x,float y,float z){auto r=ident();r.m[12]=x;r.m[13]=y;r.m[14]=z;return r;}
+Mat4 rotZ(float a){auto r=ident();float c=std::cos(a),s=std::sin(a);r.m[0]=c;r.m[4]=-s;r.m[1]=s;r.m[5]=c;return r;}
+Mat4 perspective(float f,float aspect,float zn,float zf){Mat4 r{};float q=1/std::tan(f*.5f);r.m[0]=q/aspect;r.m[5]=-q;r.m[10]=zf/(zn-zf);r.m[11]=-1;r.m[14]=(zn*zf)/(zn-zf);return r;}
+struct V3{float x,y,z;}; V3 sub(V3 a,V3 b){return{a.x-b.x,a.y-b.y,a.z-b.z};} float dot(V3 a,V3 b){return a.x*b.x+a.y*b.y+a.z*b.z;} V3 cross(V3 a,V3 b){return{a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x};} V3 norm(V3 a){float l=std::sqrt(dot(a,a));return{a.x/l,a.y/l,a.z/l};}
+Mat4 lookAt(V3 e,V3 at,V3 up){V3 f=norm(sub(at,e)),s=norm(cross(f,up)),u=cross(s,f);Mat4 r=ident();r.m[0]=s.x;r.m[4]=s.y;r.m[8]=s.z;r.m[1]=u.x;r.m[5]=u.y;r.m[9]=u.z;r.m[2]=-f.x;r.m[6]=-f.y;r.m[10]=-f.z;r.m[12]=-dot(s,e);r.m[13]=-dot(u,e);r.m[14]=dot(f,e);return r;}
+void appendGear(std::vector<GearVertex>&v,std::vector<uint32_t>&ix,int teeth,float root,float outer,float hole,float halfZ){
+    const int seg=teeth*4;std::vector<float> rad(seg);for(int i=0;i<seg;++i)rad[i]=(i%4==1||i%4==2)?outer:root;
+    auto push=[&](float x,float y,float z,float nx,float ny,float nz){v.push_back({{x,y,z},{nx,ny,nz}});return uint32_t(v.size()-1);};
+    for(int i=0;i<seg;++i){int j=(i+1)%seg;float a=6.28318530718f*i/seg,b=6.28318530718f*j/seg;float r0=rad[i],r1=rad[j];
+        // Front/back annular quads.
+        uint32_t f0=push(hole*std::cos(a),hole*std::sin(a),halfZ,0,0,1),f1=push(r0*std::cos(a),r0*std::sin(a),halfZ,0,0,1),f2=push(r1*std::cos(b),r1*std::sin(b),halfZ,0,0,1),f3=push(hole*std::cos(b),hole*std::sin(b),halfZ,0,0,1);
+        ix.insert(ix.end(),{f0,f1,f2,f0,f2,f3});
+        uint32_t q0=push(hole*std::cos(a),hole*std::sin(a),-halfZ,0,0,-1),q1=push(hole*std::cos(b),hole*std::sin(b),-halfZ,0,0,-1),q2=push(r1*std::cos(b),r1*std::sin(b),-halfZ,0,0,-1),q3=push(r0*std::cos(a),r0*std::sin(a),-halfZ,0,0,-1);
+        ix.insert(ix.end(),{q0,q1,q2,q0,q2,q3});
+        // Outer tooth wall.
+        float x0=r0*std::cos(a),y0=r0*std::sin(a),x1=r1*std::cos(b),y1=r1*std::sin(b);V3 n=norm(V3{y1-y0,-(x1-x0),0});
+        uint32_t o0=push(x0,y0,-halfZ,n.x,n.y,0),o1=push(x1,y1,-halfZ,n.x,n.y,0),o2=push(x1,y1,halfZ,n.x,n.y,0),o3=push(x0,y0,halfZ,n.x,n.y,0);ix.insert(ix.end(),{o0,o1,o2,o0,o2,o3});
+        // Inner bore wall.
+        V3 ni{-std::cos((a+b)*.5f),-std::sin((a+b)*.5f),0};uint32_t h0=push(hole*std::cos(a),hole*std::sin(a),-halfZ,ni.x,ni.y,0),h1=push(hole*std::cos(a),hole*std::sin(a),halfZ,ni.x,ni.y,0),h2=push(hole*std::cos(b),hole*std::sin(b),halfZ,ni.x,ni.y,0),h3=push(hole*std::cos(b),hole*std::sin(b),-halfZ,ni.x,ni.y,0);ix.insert(ix.end(),{h0,h1,h2,h0,h2,h3});
+    }
+}
+std::vector<uint32_t> readSpv(const wchar_t* path){std::ifstream f(path,std::ios::binary|std::ios::ate);if(!f)return{};auto n=f.tellg();std::vector<uint32_t>d((size_t(n)+3)/4);f.seekg(0);f.read((char*)d.data(),n);return d;}
+}
+void VulkanRenderer::destroyGearFramebuffers(){
+    if(!device_)return;for(auto f:gearFramebuffers_)vkDestroyFramebuffer(device_,f,nullptr);gearFramebuffers_.clear();
+    if(gearDepthView_)vkDestroyImageView(device_,gearDepthView_,nullptr);if(gearDepth_)vkDestroyImage(device_,gearDepth_,nullptr);if(gearDepthMemory_)vkFreeMemory(device_,gearDepthMemory_,nullptr);
+    gearDepthView_=VK_NULL_HANDLE;gearDepth_=VK_NULL_HANDLE;gearDepthMemory_=VK_NULL_HANDLE;
+}
+void VulkanRenderer::createGearFramebuffers(){
+    if(!device_||!gearRenderPass_||swapImages_.empty())return;destroyGearFramebuffers();
+    gearDepthFormat_=VK_FORMAT_D32_SFLOAT;
+    VkImageCreateInfo di{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};di.imageType=VK_IMAGE_TYPE_2D;di.format=gearDepthFormat_;di.extent={extent_.width,extent_.height,1};di.mipLevels=1;di.arrayLayers=1;di.samples=VK_SAMPLE_COUNT_1_BIT;di.tiling=VK_IMAGE_TILING_OPTIMAL;di.usage=VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;di.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
+    vkCheck(vkCreateImage(device_,&di,nullptr,&gearDepth_),"Could not create gear depth image.");VkMemoryRequirements mr{};vkGetImageMemoryRequirements(device_,gearDepth_,&mr);VkMemoryAllocateInfo ma{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};ma.allocationSize=mr.size;ma.memoryTypeIndex=findMemoryType(mr.memoryTypeBits,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);vkCheck(vkAllocateMemory(device_,&ma,nullptr,&gearDepthMemory_),"Could not allocate gear depth memory.");vkBindImageMemory(device_,gearDepth_,gearDepthMemory_,0);
+    VkImageViewCreateInfo dv{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};dv.image=gearDepth_;dv.viewType=VK_IMAGE_VIEW_TYPE_2D;dv.format=gearDepthFormat_;dv.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT;dv.subresourceRange.levelCount=1;dv.subresourceRange.layerCount=1;vkCheck(vkCreateImageView(device_,&dv,nullptr,&gearDepthView_),"Could not create gear depth view.");
+    for(auto image:swapImages_){VkImageView view{};VkImageViewCreateInfo vi{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};vi.image=image;vi.viewType=VK_IMAGE_VIEW_TYPE_2D;vi.format=swapFormat_;vi.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;vi.subresourceRange.levelCount=1;vi.subresourceRange.layerCount=1;vkCheck(vkCreateImageView(device_,&vi,nullptr,&view),"Could not create swap image view.");VkImageView at[]={view,gearDepthView_};VkFramebufferCreateInfo fi{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};fi.renderPass=gearRenderPass_;fi.attachmentCount=2;fi.pAttachments=at;fi.width=extent_.width;fi.height=extent_.height;fi.layers=1;VkFramebuffer fb{};vkCheck(vkCreateFramebuffer(device_,&fi,nullptr,&fb),"Could not create gear framebuffer.");gearFramebuffers_.push_back(fb);vkDestroyImageView(device_,view,nullptr);}
+}
+void VulkanRenderer::destroyGearResources(){
+    if(!device_)return;destroyGearFramebuffers();if(gearPipeline_)vkDestroyPipeline(device_,gearPipeline_,nullptr);if(gearPipelineLayout_)vkDestroyPipelineLayout(device_,gearPipelineLayout_,nullptr);if(gearRenderPass_)vkDestroyRenderPass(device_,gearRenderPass_,nullptr);if(gearVertexBuffer_)vkDestroyBuffer(device_,gearVertexBuffer_,nullptr);if(gearVertexMemory_)vkFreeMemory(device_,gearVertexMemory_,nullptr);if(gearIndexBuffer_)vkDestroyBuffer(device_,gearIndexBuffer_,nullptr);if(gearIndexMemory_)vkFreeMemory(device_,gearIndexMemory_,nullptr);
+    gearPipeline_=VK_NULL_HANDLE;gearPipelineLayout_=VK_NULL_HANDLE;gearRenderPass_=VK_NULL_HANDLE;gearVertexBuffer_=gearIndexBuffer_=VK_NULL_HANDLE;gearVertexMemory_=gearIndexMemory_=VK_NULL_HANDLE;gearIndexCount_=0;
+}
+void VulkanRenderer::createGearResources(){
+    auto vs=readSpv(L"cog.vert.spv"),fs=readSpv(L"cog.frag.spv");if(vs.empty()||fs.empty())return;
+    std::vector<GearVertex> verts;std::vector<uint32_t> inds;appendGear(verts,inds,14,1.00f,1.16f,.32f,.22f);gearIndexCount_=(uint32_t)inds.size();
+    auto buffer=[&](VkDeviceSize size,VkBufferUsageFlags use,VkBuffer&b,VkDeviceMemory&m,const void*src){VkBufferCreateInfo bi{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};bi.size=size;bi.usage=use;bi.sharingMode=VK_SHARING_MODE_EXCLUSIVE;vkCheck(vkCreateBuffer(device_,&bi,nullptr,&b),"Could not create gear buffer.");VkMemoryRequirements mr{};vkGetBufferMemoryRequirements(device_,b,&mr);VkMemoryAllocateInfo ai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};ai.allocationSize=mr.size;ai.memoryTypeIndex=findMemoryType(mr.memoryTypeBits,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);vkCheck(vkAllocateMemory(device_,&ai,nullptr,&m),"Could not allocate gear buffer.");vkBindBufferMemory(device_,b,m,0);void*p{};vkMapMemory(device_,m,0,size,0,&p);std::memcpy(p,src,(size_t)size);vkUnmapMemory(device_,m);};
+    buffer(verts.size()*sizeof(GearVertex),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,gearVertexBuffer_,gearVertexMemory_,verts.data());buffer(inds.size()*4,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,gearIndexBuffer_,gearIndexMemory_,inds.data());
+    VkAttachmentDescription at[2]{};at[0].format=swapFormat_;at[0].samples=VK_SAMPLE_COUNT_1_BIT;at[0].loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;at[0].storeOp=VK_ATTACHMENT_STORE_OP_STORE;at[0].initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;at[0].finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;at[1].format=VK_FORMAT_D32_SFLOAT;at[1].samples=VK_SAMPLE_COUNT_1_BIT;at[1].loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;at[1].storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE;at[1].initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;at[1].finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    VkAttachmentReference cr{0,VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},dr{1,VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};VkSubpassDescription sp{};sp.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS;sp.colorAttachmentCount=1;sp.pColorAttachments=&cr;sp.pDepthStencilAttachment=&dr;VkRenderPassCreateInfo ri{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};ri.attachmentCount=2;ri.pAttachments=at;ri.subpassCount=1;ri.pSubpasses=&sp;vkCheck(vkCreateRenderPass(device_,&ri,nullptr,&gearRenderPass_),"Could not create gear render pass.");
+    struct PC{Mat4 mvp,model;float color[4];};VkPushConstantRange pr{VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(PC)};VkPipelineLayoutCreateInfo li{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};li.pushConstantRangeCount=1;li.pPushConstantRanges=&pr;vkCheck(vkCreatePipelineLayout(device_,&li,nullptr,&gearPipelineLayout_),"Could not create gear pipeline layout.");
+    auto sm=[&](const std::vector<uint32_t>&d){VkShaderModule s{};VkShaderModuleCreateInfo si{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};si.codeSize=d.size()*4;si.pCode=d.data();vkCheck(vkCreateShaderModule(device_,&si,nullptr,&s),"Could not create gear shader.");return s;};VkShaderModule vsm=sm(vs),fsm=sm(fs);VkPipelineShaderStageCreateInfo ss[2]={{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,nullptr,0,VK_SHADER_STAGE_VERTEX_BIT,vsm,"main",nullptr},{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,nullptr,0,VK_SHADER_STAGE_FRAGMENT_BIT,fsm,"main",nullptr}};
+    VkVertexInputBindingDescription bd{0,sizeof(GearVertex),VK_VERTEX_INPUT_RATE_VERTEX};VkVertexInputAttributeDescription ad[2]={{0,0,VK_FORMAT_R32G32B32_SFLOAT,offsetof(GearVertex,p)},{1,0,VK_FORMAT_R32G32B32_SFLOAT,offsetof(GearVertex,n)}};VkPipelineVertexInputStateCreateInfo vi{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};vi.vertexBindingDescriptionCount=1;vi.pVertexBindingDescriptions=&bd;vi.vertexAttributeDescriptionCount=2;vi.pVertexAttributeDescriptions=ad;VkPipelineInputAssemblyStateCreateInfo ia{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};ia.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;VkPipelineViewportStateCreateInfo vp{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};vp.viewportCount=1;vp.scissorCount=1;VkPipelineRasterizationStateCreateInfo rs{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};rs.polygonMode=VK_POLYGON_MODE_FILL;rs.cullMode=VK_CULL_MODE_BACK_BIT;rs.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;rs.lineWidth=1;VkPipelineMultisampleStateCreateInfo ms{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};ms.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;VkPipelineDepthStencilStateCreateInfo ds{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};ds.depthTestEnable=ds.depthWriteEnable=VK_TRUE;ds.depthCompareOp=VK_COMPARE_OP_LESS;VkPipelineColorBlendAttachmentState ba{};ba.colorWriteMask=15;VkPipelineColorBlendStateCreateInfo bs{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};bs.attachmentCount=1;bs.pAttachments=&ba;VkDynamicState dyns[]={VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};VkPipelineDynamicStateCreateInfo dy{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};dy.dynamicStateCount=2;dy.pDynamicStates=dyns;VkGraphicsPipelineCreateInfo gi{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};gi.stageCount=2;gi.pStages=ss;gi.pVertexInputState=&vi;gi.pInputAssemblyState=&ia;gi.pViewportState=&vp;gi.pRasterizationState=&rs;gi.pMultisampleState=&ms;gi.pDepthStencilState=&ds;gi.pColorBlendState=&bs;gi.pDynamicState=&dy;gi.layout=gearPipelineLayout_;gi.renderPass=gearRenderPass_;vkCheck(vkCreateGraphicsPipelines(device_,VK_NULL_HANDLE,1,&gi,nullptr,&gearPipeline_),"Could not create 3D gear pipeline.");vkDestroyShaderModule(device_,vsm,nullptr);vkDestroyShaderModule(device_,fsm,nullptr);createGearFramebuffers();
+}
+bool VulkanRenderer::drawGearCalibration(float seconds){
+    if(!device_||!gearPipeline_||!swapchain_)return false;if(resizePending_){vkDeviceWaitIdle(device_);destroySwapchain();createSwapchain();if(!swapchain_)return false;}
+    uint32_t imageIndex=0;VkResult acq=vkAcquireNextImageKHR(device_,swapchain_,UINT64_MAX,imageAvailable_,VK_NULL_HANDLE,&imageIndex);if(acq==VK_ERROR_OUT_OF_DATE_KHR){resized();return false;}if(acq!=VK_SUCCESS&&acq!=VK_SUBOPTIMAL_KHR)return false;
+    VkCommandBuffer cmd=beginOneTime();VkClearValue clears[2]{};clears[0].color={{.025f,.035f,.055f,1}};clears[1].depthStencil={1,0};VkRenderPassBeginInfo rb{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};rb.renderPass=gearRenderPass_;rb.framebuffer=gearFramebuffers_[imageIndex];rb.renderArea.extent=extent_;rb.clearValueCount=2;rb.pClearValues=clears;vkCmdBeginRenderPass(cmd,&rb,VK_SUBPASS_CONTENTS_INLINE);vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,gearPipeline_);VkDeviceSize off=0;vkCmdBindVertexBuffers(cmd,0,1,&gearVertexBuffer_,&off);vkCmdBindIndexBuffer(cmd,gearIndexBuffer_,0,VK_INDEX_TYPE_UINT32);VkViewport viewport{0,0,(float)extent_.width,(float)extent_.height,0,1};VkRect2D sc{{0,0},extent_};vkCmdSetViewport(cmd,0,1,&viewport);vkCmdSetScissor(cmd,0,1,&sc);
+    struct PC{Mat4 mvp,model;float color[4];};float orbit=seconds*.45f;V3 eye{5.2f*std::cos(orbit),5.2f*std::sin(orbit),3.7f};Mat4 vp=mul(perspective(.82f,float(extent_.width)/float(extent_.height),.1f,30),lookAt(eye,{0,0,0},{0,0,1}));
+    auto gear=[&](float x,float scale,float spin,float r,float g,float b){Mat4 model=mul(translate(x,0,0),rotZ(spin));model.m[0]*=scale;model.m[1]*=scale;model.m[4]*=scale;model.m[5]*=scale;model.m[8]*=scale;model.m[9]*=scale;model.m[10]*=scale;PC pc{mul(vp,model),model,{r,g,b,1}};vkCmdPushConstants(cmd,gearPipelineLayout_,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(pc),&pc);vkCmdDrawIndexed(cmd,gearIndexCount_,1,0,0,0);};
+    gear(-1.05f,1,seconds*1.6f,.86f,.58f,.16f);gear(1.18f,.72f,-seconds*2.22f+.14f,.22f,.48f,.88f);vkCmdEndRenderPass(cmd);vkEndCommandBuffer(cmd);VkPipelineStageFlags wait=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};si.waitSemaphoreCount=1;si.pWaitSemaphores=&imageAvailable_;si.pWaitDstStageMask=&wait;si.commandBufferCount=1;si.pCommandBuffers=&cmd;si.signalSemaphoreCount=1;si.pSignalSemaphores=&renderFinished_;if(vkQueueSubmit(queue_,1,&si,VK_NULL_HANDLE)!=VK_SUCCESS){vkFreeCommandBuffers(device_,commandPool_,1,&cmd);return false;}VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};pi.waitSemaphoreCount=1;pi.pWaitSemaphores=&renderFinished_;pi.swapchainCount=1;pi.pSwapchains=&swapchain_;pi.pImageIndices=&imageIndex;VkResult pr=vkQueuePresentKHR(queue_,&pi);vkQueueWaitIdle(queue_);vkFreeCommandBuffers(device_,commandPool_,1,&cmd);if(pr==VK_ERROR_OUT_OF_DATE_KHR||pr==VK_SUBOPTIMAL_KHR)resized();return pr==VK_SUCCESS||pr==VK_SUBOPTIMAL_KHR;
 }
