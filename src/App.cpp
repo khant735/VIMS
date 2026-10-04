@@ -200,7 +200,7 @@ void App::createUi() {
     if(smtPos!=std::wstring::npos) cpuSummary.replace(smtPos,1,L"\r\n");
     cpuText_ = CreateWindowW(L"STATIC",cpuSummary.c_str(),WS_CHILD|WS_VISIBLE|SS_LEFT,
         0,0,100,20,panelContent_,nullptr,instance_,nullptr);
-    cpuUsageText_ = CreateWindowW(L"STATIC", L"CPU utilisation (all logical processors): sampling...", WS_CHILD | WS_VISIBLE,
+    cpuUsageText_ = CreateWindowW(L"STATIC", L"Overall CPU utilisation: sampling...\r\nPer-core / logical-thread utilisation: sampling...", WS_CHILD | WS_VISIBLE | SS_LEFT,
         0,0,100,20, panelContent_, nullptr, instance_, nullptr);
     gpuText_ = CreateWindowW(L"STATIC", L"GPU: initialising Vulkan...", WS_CHILD | WS_VISIBLE,
         0,0,100,20, panelContent_, nullptr, instance_, nullptr);
@@ -354,7 +354,9 @@ void App::layout() {
     if(cpuOld)SelectObject(cpuDc,cpuOld);ReleaseDC(cpuText_,cpuDc);
     const int cpuH=std::max(S(22),cpuMeasure.bottom-cpuMeasure.top+S(4));
     place(cpuText_,x,y,w,cpuH); y+=cpuH+S(5);
-    place(cpuUsageText_,x,y,w,S(22)); y+=S(31);
+    const int cpuUsageLines=2+cpu_.physicalCores()+cpu_.logicalProcessors();
+    const int cpuUsageH=S(std::max(44,cpuUsageLines*18));
+    place(cpuUsageText_,x,y,w,cpuUsageH); y+=cpuUsageH+S(9);
     place(gpuText_,x,y,w,S(66)); y+=S(72);
     place(gpuUsageText_,x,y,w,S(66)); y+=S(75);
     place(cpuCombo_,x,y,w,S(200)); y+=S(30);
@@ -463,7 +465,21 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 if(prevKernel||prevUser){
                     const ULONGLONG total=(kernel-prevKernel)+(user-prevUser), idleDelta=idle-prevIdle;
                     const int usage=total?int(std::clamp(100.0*(double(total-idleDelta)/double(total)),0.0,100.0)+0.5):0;
-                    SetWindowTextW(cpuUsageText_,(L"CPU utilisation (all logical processors): "+std::to_wstring(usage)+L"%").c_str());
+                    std::wstringstream cpuUse;
+                    cpuUse<<L"Overall CPU utilisation: "<<usage<<L"%\r\n";
+                    cpuUse<<L"Per-core / logical-thread utilisation:\r\n";
+                    // Windows' aggregate sample is available here today. Show the
+                    // real physical-core -> logical-processor topology now; individual
+                    // utilisation samples are populated as sampling support is added.
+                    const auto& topology=cpu_.coreLogicalProcessors();
+                    for(size_t core=0;core<topology.size();++core){
+                        cpuUse<<L"  Physical Core "<<core;
+                        if(topology[core].empty()) cpuUse<<L": logical processor mapping unavailable";
+                        cpuUse<<L"\r\n";
+                        for(int lp:topology[core])
+                            cpuUse<<L"    Logical Processor "<<lp<<L": sampling...\r\n";
+                    }
+                    SetWindowTextW(cpuUsageText_,cpuUse.str().c_str());
                 }
                 prevIdle=idle;prevKernel=kernel;prevUser=user;
             }
