@@ -59,6 +59,54 @@ std::wstring utf8ToWide(const std::string& s) {
 }
 
 struct GpuSample { std::wstring name; LUID luid{}; SIZE_T dedicatedBytes=0; int utilisation=-1; };
+
+// Compact icon artwork used by owner-drawn action buttons. The control text is
+// retained as the accessible name; only the glyph is painted.
+void drawActionGlyph(const DRAWITEMSTRUCT* d){
+    if(!d||d->CtlType!=ODT_BUTTON)return;
+    HDC dc=d->hDC;RECT r=d->rcItem;const bool down=(d->itemState&ODS_SELECTED)!=0;
+    HBRUSH bg=CreateSolidBrush(RGB(down?218:242,down?224:246,down?232:250));
+    FillRect(dc,&r,bg);DeleteObject(bg);FrameRect(dc,&r,(HBRUSH)GetStockObject(GRAY_BRUSH));
+    const int cx=(r.left+r.right)/2+(down?1:0),cy=(r.top+r.bottom)/2+(down?1:0);
+    HPEN pen=CreatePen(PS_SOLID,2,RGB(35,105,180)),oldPen=(HPEN)SelectObject(dc,pen);
+    HBRUSH blue=CreateSolidBrush(RGB(65,145,225)),oldBrush=(HBRUSH)SelectObject(dc,blue);
+    auto line=[&](int x1,int y1,int x2,int y2){MoveToEx(dc,x1,y1,nullptr);LineTo(dc,x2,y2);};
+    switch(d->CtlID){
+    case IDC_ZOOM_OUT: case IDC_ZOOM_IN:
+        SelectObject(dc,GetStockObject(NULL_BRUSH));Ellipse(dc,cx-7,cy-7,cx+5,cy+5);line(cx+4,cy+4,cx+10,cy+10);
+        line(cx-4,cy-1,cx+2,cy-1);if(d->CtlID==IDC_ZOOM_IN)line(cx-1,cy-4,cx-1,cy+2);break;
+    case IDC_ZOOM_FIT:
+        line(cx-9,cy-3,cx-9,cy-9);line(cx-9,cy-9,cx-3,cy-9);line(cx+9,cy-3,cx+9,cy-9);line(cx+9,cy-9,cx+3,cy-9);
+        line(cx-9,cy+3,cx-9,cy+9);line(cx-9,cy+9,cx-3,cy+9);line(cx+9,cy+3,cx+9,cy+9);line(cx+9,cy+9,cx+3,cy+9);break;
+    case IDC_OPEN:
+        {HBRUSH gold=CreateSolidBrush(RGB(245,174,48));SelectObject(dc,gold);Rectangle(dc,cx-10,cy-6,cx+10,cy+8);DeleteObject(gold);line(cx-8,cy-7,cx-2,cy-7);line(cx-2,cy-7,cx,cy-4);}break;
+    case IDC_ANALYSE:
+        {HBRUSH green=CreateSolidBrush(RGB(52,190,70));SelectObject(dc,green);POINT p[3]={{cx-6,cy-9},{cx+9,cy},{cx-6,cy+9}};Polygon(dc,p,3);DeleteObject(green);}break;
+    case IDC_GPU_SELFTEST:
+        Rectangle(dc,cx-10,cy-8,cx+10,cy+5);line(cx-5,cy+9,cx+5,cy+9);line(cx,cy+5,cx,cy+9);break;
+    case IDC_DIAGNOSTICS:
+        Rectangle(dc,cx-10,cy-7,cx+6,cy+6);line(cx-8,cy,cx-4,cy);line(cx-4,cy,cx-1,cy-4);line(cx-1,cy-4,cx+2,cy+4);line(cx+2,cy+4,cx+5,cy);Ellipse(dc,cx+4,cy+3,cx+11,cy+10);break;
+    case IDC_POSE_GIF:
+        Rectangle(dc,cx-11,cy-8,cx+11,cy+8);SetBkMode(dc,TRANSPARENT);SetTextColor(dc,RGB(30,30,30));DrawTextW(dc,L"GIF",-1,&r,DT_CENTER|DT_VCENTER|DT_SINGLELINE);break;
+    case IDC_FACE_MODEL:
+        Ellipse(dc,cx-9,cy-9,cx+9,cy+9);line(cx-5,cy,cx+5,cy);line(cx,cy-5,cx,cy+5);break;
+    case IDC_APPLY_GUIDE:
+        {HPEN g=CreatePen(PS_SOLID,3,RGB(35,175,55));SelectObject(dc,g);line(cx-9,cy,cx-2,cy+7);line(cx-2,cy+7,cx+10,cy-7);SelectObject(dc,pen);DeleteObject(g);}break;
+    case IDC_RESET_GUIDE:
+        Arc(dc,cx-9,cy-9,cx+9,cy+9,cx-8,cy+5,cx-7,cy-6);line(cx-8,cy-6,cx-9,cy);line(cx-8,cy-6,cx-2,cy-6);break;
+    case IDC_CREATE_PART:
+        line(cx-8,cy+7,cx+8,cy-9);line(cx-5,cy+4,cx-1,cy+8);line(cx+1,cy-2,cx+5,cy+2);Ellipse(dc,cx+5,cy-10,cx+9,cy-6);break;
+    case IDC_APPROVE_MASK:
+        {HPEN g=CreatePen(PS_SOLID,3,RGB(35,175,55));SelectObject(dc,g);line(cx-9,cy,cx-2,cy+7);line(cx-2,cy+7,cx+10,cy-7);SelectObject(dc,pen);DeleteObject(g);}break;
+    case IDC_EXPORT: case IDC_EXPORT_ALL:
+        Rectangle(dc,cx-10,cy-8,cx+3,cy+6);line(cx-1,cy,cx+10,cy);line(cx+10,cy,cx+5,cy-5);line(cx+10,cy,cx+5,cy+5);break;
+    default:
+        Ellipse(dc,cx-5,cy-5,cx+5,cy+5);break;
+    }
+    SelectObject(dc,oldBrush);SelectObject(dc,oldPen);DeleteObject(blue);DeleteObject(pen);
+    if(d->itemState&ODS_FOCUS){RECT fr=r;InflateRect(&fr,-3,-3);DrawFocusRect(dc,&fr);}
+}
+
 std::wstring lowerCopy(std::wstring v){std::transform(v.begin(),v.end(),v.begin(),[](wchar_t x){return std::towlower(x);});return v;}
 std::array<std::wstring,2> luidTokens(const LUID& l){
     wchar_t a[64]{},b[64]{};
@@ -178,7 +226,7 @@ LRESULT CALLBACK App::panelProc(HWND h,UINT m,WPARAM w,LPARAM l){
     if(m==WM_NCCREATE)SetWindowLongPtrW(h,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(reinterpret_cast<CREATESTRUCTW*>(l)->lpCreateParams));
     auto* app=reinterpret_cast<App*>(GetWindowLongPtrW(h,GWLP_USERDATA));
     if(app){
-        if(m==WM_COMMAND||m==WM_NOTIFY||m==WM_HSCROLL)return SendMessageW(app->hwnd_,m,w,l);
+        if(m==WM_COMMAND||m==WM_NOTIFY||m==WM_HSCROLL||m==WM_DRAWITEM)return SendMessageW(app->hwnd_,m,w,l);
         if(m==WM_VSCROLL){app->scrollPanel(LOWORD(w),HIWORD(w));return 0;}
         if(m==WM_MOUSEWHEEL){app->scrollPanel(SB_THUMBPOSITION,app->panelScroll_-(GET_WHEEL_DELTA_WPARAM(w)/WHEEL_DELTA)*60);return 0;}
     }
@@ -192,9 +240,9 @@ void App::createUi() {
     rightPanel_=CreateWindowExW(WS_EX_COMPOSITED,L"VulkanImageMaskStudioPanel",nullptr,WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN,0,0,100,100,hwnd_,nullptr,instance_,this);
     panelContent_=CreateWindowExW(0,L"VulkanImageMaskStudioPanel",nullptr,WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,0,0,100,100,rightPanel_,nullptr,instance_,this);
     panelScrollbar_=CreateWindowW(L"SCROLLBAR",nullptr,WS_CHILD|WS_VISIBLE|SBS_VERT|WS_CLIPSIBLINGS,0,0,32,100,rightPanel_,nullptr,instance_,nullptr);
-    zoomOutBtn_=CreateWindowW(L"BUTTON",L"-",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,34,28,hwnd_,(HMENU)IDC_ZOOM_OUT,instance_,nullptr);
-    zoomFitBtn_=CreateWindowW(L"BUTTON",L"Fit image",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,90,28,hwnd_,(HMENU)IDC_ZOOM_FIT,instance_,nullptr);
-    zoomInBtn_=CreateWindowW(L"BUTTON",L"+",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,34,28,hwnd_,(HMENU)IDC_ZOOM_IN,instance_,nullptr);
+    zoomOutBtn_=CreateWindowW(L"BUTTON",L"-",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,0,0,34,28,hwnd_,(HMENU)IDC_ZOOM_OUT,instance_,nullptr);
+    zoomFitBtn_=CreateWindowW(L"BUTTON",L"Fit image",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,0,0,90,28,hwnd_,(HMENU)IDC_ZOOM_FIT,instance_,nullptr);
+    zoomInBtn_=CreateWindowW(L"BUTTON",L"+",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,0,0,34,28,hwnd_,(HMENU)IDC_ZOOM_IN,instance_,nullptr);
     std::wstring cpuSummary=L"CPU: "+cpu_.name()+L"\r\n"+cpu_.description();
     // Put SMT/Hyper-Threading status on its own line when present.
     const auto smtPos=cpuSummary.find(L" (SMT");
@@ -233,13 +281,13 @@ void App::createUi() {
     SendMessageW(backendCombo_,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"CPU only (no DirectML)"));
     SendMessageW(backendCombo_,CB_SETCURSEL,0,0);
 
-    openBtn_ = CreateWindowW(L"BUTTON", L"Open image...", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    openBtn_ = CreateWindowW(L"BUTTON", L"Open image...", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_OPEN), instance_, nullptr);
-    analyseBtn_ = CreateWindowW(L"BUTTON", L"Analyse image", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    analyseBtn_ = CreateWindowW(L"BUTTON", L"Analyse image", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_ANALYSE), instance_, nullptr);
-    gpuSelfTestBtn_ = CreateWindowW(L"BUTTON", L"Render Test / Calibration", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    gpuSelfTestBtn_ = CreateWindowW(L"BUTTON", L"Render Test / Calibration", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_GPU_SELFTEST), instance_, nullptr);
-    diagnosticsBtn_ = CreateWindowW(L"BUTTON", L"Runtime diagnostics", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    diagnosticsBtn_ = CreateWindowW(L"BUTTON", L"Runtime diagnostics", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_DIAGNOSTICS), instance_, nullptr);
 
     maskLabel_ = CreateWindowW(L"STATIC", L"Detected subjects and parts", WS_CHILD | WS_VISIBLE,
@@ -254,23 +302,23 @@ void App::createUi() {
     cutoutCheck_ = CreateWindowW(L"BUTTON", L"Also export transparent PNG cutouts", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
         0,0,100,24, panelContent_, reinterpret_cast<HMENU>(IDC_TRANSPARENT_CUTOUT), instance_, nullptr);
 
-    exportBtn_ = CreateWindowW(L"BUTTON", L"Export selected mask + boundary", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    exportBtn_ = CreateWindowW(L"BUTTON", L"Export selected mask + boundary", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_EXPORT), instance_, nullptr);
-    exportAllBtn_ = CreateWindowW(L"BUTTON", L"Export all masks", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    exportAllBtn_ = CreateWindowW(L"BUTTON", L"Export all masks", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_EXPORT_ALL), instance_, nullptr);
-    poseGifBtn_ = CreateWindowW(L"BUTTON", L"Export 30-second pose GIFs", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    poseGifBtn_ = CreateWindowW(L"BUTTON", L"Export 30-second pose GIFs", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_POSE_GIF), instance_, nullptr);
     guideBtn_ = CreateWindowW(L"BUTTON",L"Edit mask area",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_GUIDE),instance_,nullptr);
-    applyGuideBtn_ = CreateWindowW(L"BUTTON",L"Apply area",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+    applyGuideBtn_ = CreateWindowW(L"BUTTON",L"Apply area",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_APPLY_GUIDE),instance_,nullptr);
-    resetGuideBtn_ = CreateWindowW(L"BUTTON",L"Reset area",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+    resetGuideBtn_ = CreateWindowW(L"BUTTON",L"Reset area",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_RESET_GUIDE),instance_,nullptr);
-    createPartBtn_=CreateWindowW(L"BUTTON",L"Create missing mask",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+    createPartBtn_=CreateWindowW(L"BUTTON",L"Create missing mask",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_CREATE_PART),instance_,nullptr);
-    approveBtn_=CreateWindowW(L"BUTTON",L"Approve mask for learning",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+    approveBtn_=CreateWindowW(L"BUTTON",L"Approve mask for learning",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_APPROVE_MASK),instance_,nullptr);
-    faceModelBtn_=CreateWindowW(L"BUTTON",L"Download Core + Face AI Models",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,100,30,panelContent_,(HMENU)IDC_FACE_MODEL,instance_,nullptr);
+    faceModelBtn_=CreateWindowW(L"BUTTON",L"Download Core + Face AI Models",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,0,0,100,30,panelContent_,(HMENU)IDC_FACE_MODEL,instance_,nullptr);
     faceModelStatus_=CreateWindowW(L"STATIC",L"",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,100,22,panelContent_,nullptr,instance_,nullptr);
     updateFaceModelStatus();
     refineGroup_=CreateWindowW(L"STATIC",L"Mask Refinement",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,100,100,panelContent_,nullptr,instance_,nullptr);
@@ -320,17 +368,12 @@ void App::layout() {
     // Use the otherwise empty preview toolbar for the primary/open and
     // maintenance actions. These controls are reparented here so they remain
     // visible above the Vulkan surface instead of consuming the right panel.
-    const int topButtonH=S(24), topGap=S(6);
+    const int topButtonH=S(30), topGap=S(6);
     int topX=S(188);
     SetParent(openBtn_,hwnd_);SetParent(gpuSelfTestBtn_,hwnd_);SetParent(diagnosticsBtn_,hwnd_);SetParent(poseGifBtn_,hwnd_);
     auto fitToolbarButton=[&](HWND button){
-        wchar_t label[256]{};GetWindowTextW(button,label,256);
-        HDC dc=GetDC(button);HFONT font=(HFONT)SendMessageW(button,WM_GETFONT,0,0),oldFont=nullptr;
-        if(font)oldFont=(HFONT)SelectObject(dc,font);
-        SIZE textSize{};GetTextExtentPoint32W(dc,label,lstrlenW(label),&textSize);
-        if(oldFont)SelectObject(dc,oldFont);ReleaseDC(button,dc);
-        const int bw=std::max(S(34),static_cast<int>(textSize.cx)+S(16));
-        MoveWindow(button,topX,S(10),bw,topButtonH,TRUE);
+        const int bw=S(32);
+        MoveWindow(button,topX,S(7),bw,topButtonH,TRUE);
         topX+=bw+topGap;
     };
     fitToolbarButton(openBtn_);
@@ -357,16 +400,8 @@ void App::layout() {
                 SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW);
     };
     int x=pad,y=pad,w=available;
-    const int row=S(24), btn=S(24), labelW=std::clamp(int(w*.48),S(175),S(245));
-    auto buttonWidth=[&](HWND button,int extra=S(16)){
-        if(!button||!IsWindow(button))return S(34);
-        wchar_t label[512]{};GetWindowTextW(button,label,512);
-        HDC dc=GetDC(button);HFONT font=(HFONT)SendMessageW(button,WM_GETFONT,0,0),oldFont=nullptr;
-        if(font)oldFont=(HFONT)SelectObject(dc,font);
-        SIZE size{};GetTextExtentPoint32W(dc,label,lstrlenW(label),&size);
-        if(oldFont)SelectObject(dc,oldFont);ReleaseDC(button,dc);
-        return std::min(w,std::max(S(34),static_cast<int>(size.cx)+extra));
-    };
+    const int row=S(24), btn=S(30), labelW=std::clamp(int(w*.48),S(175),S(245));
+    auto buttonWidth=[&](HWND,int=S(16)){ return S(32); };
     auto placeButton=[&](HWND button,int xx,int yy,int maxW=w){
         const int bw=std::min(maxW,buttonWidth(button));
         place(button,xx,yy,bw,btn);
@@ -476,6 +511,7 @@ void App::scrollPanel(int code,int value){
 LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
     switch (m) {
     case WM_SIZE: layout(); return 0;
+    case WM_DRAWITEM: drawActionGlyph(reinterpret_cast<const DRAWITEMSTRUCT*>(l)); return TRUE;
     case WM_NCLBUTTONDBLCLK: if(w==HTCAPTION)return 0;break;
     case WM_SYSCOMMAND:
         if((w&0xfff0)==SC_RESTORE){if(IsIconic(h))ShowWindow(h,SW_SHOWMAXIMIZED);return 0;}
