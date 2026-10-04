@@ -50,6 +50,20 @@ bool D3D11CalibrationRenderer::draw(float seconds){
     D3D11_VIEWPORT vp{0,0,(float)r.right,(float)r.bottom,0,1};context_->RSSetViewports(1,&vp);UINT stride=sizeof(V),off=0;context_->IASetVertexBuffers(0,1,&vb_,&stride,&off);context_->IASetInputLayout(layout_);context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);context_->VSSetShader(vs_,nullptr,0);context_->PSSetShader(ps_,nullptr,0);
     float c=cosf(seconds),s=sinf(seconds);C x{{c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE map{};context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&map);memcpy(map.pData,&x,sizeof(x));context_->Unmap(cb_,0);context_->VSSetConstantBuffers(0,1,&cb_);context_->Draw(336,0);
     if(!identityBackend_.empty()){
+        // Diagnostic marker: a bright magenta rectangle in the upper-left, rendered
+        // by the same D3D11 draw path as the identity HUD. If this is visible but
+        // glyphs are not, glyph generation/placement is at fault. If it is absent,
+        // the HUD draw pass itself is not reaching the presented framebuffer.
+        {
+            V q[]={{-.98f,.98f,0,1,0,1},{-.30f,.98f,0,1,0,1},{-.30f,.78f,0,1,0,1},
+                   {-.98f,.98f,0,1,0,1},{-.30f,.78f,0,1,0,1},{-.98f,.78f,0,1,0,1}};
+            ID3D11Buffer* qb=nullptr;D3D11_BUFFER_DESC qd{};qd.ByteWidth=sizeof(q);qd.Usage=D3D11_USAGE_IMMUTABLE;qd.BindFlags=D3D11_BIND_VERTEX_BUFFER;D3D11_SUBRESOURCE_DATA qi{q};
+            if(SUCCEEDED(device_->CreateBuffer(&qd,&qi,&qb))){
+                ID3D11DepthStencilState* noDepth=nullptr;D3D11_DEPTH_STENCIL_DESC nd{};nd.DepthEnable=FALSE;nd.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ZERO;nd.DepthFunc=D3D11_COMPARISON_ALWAYS;device_->CreateDepthStencilState(&nd,&noDepth);context_->OMSetDepthStencilState(noDepth,0);
+                UINT qs=sizeof(V),qo=0;context_->IASetVertexBuffers(0,1,&qb,&qs,&qo);C id{{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE qm{};if(SUCCEEDED(context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&qm))){memcpy(qm.pData,&id,sizeof(id));context_->Unmap(cb_,0);context_->Draw(6,0);}
+                context_->OMSetDepthStencilState(nullptr,0);if(noDepth)noDepth->Release();qb->Release();
+            }
+        }
         // Draw the identity as framebuffer geometry after the gears. Disable depth
         // so the HUD cannot be rejected by the scene depth buffer.
         std::wstring label=identityBackend_+L"  "+identityGpu_;std::vector<V> tv;addTextBars(tv,label,-.94f,.88f,.014f);
