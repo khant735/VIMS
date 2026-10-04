@@ -458,29 +458,46 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
         if(nowTick-lastTick>=1000){
             lastTick=nowTick;
             static ULONGLONG prevIdle=0,prevKernel=0,prevUser=0;
+            static std::vector<SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION> prevCpu;
             FILETIME idleFt{},kernelFt{},userFt{};
             if(GetSystemTimes(&idleFt,&kernelFt,&userFt)){
                 auto q=[](const FILETIME& ft){return (ULONGLONG(ft.dwHighDateTime)<<32)|ft.dwLowDateTime;};
                 const ULONGLONG idle=q(idleFt),kernel=q(kernelFt),user=q(userFt);
-                if(prevKernel||prevUser){
+                const ULONG cpuCount=GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+                std::vector<SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION> curCpu(cpuCount);
+                ULONG bytes=0;
+                const NTSTATUS cpuStatus=NtQuerySystemInformation(SystemProcessorPerformanceInformation,
+                    curCpu.data(),static_cast<ULONG>(curCpu.size()*sizeof(curCpu[0])),&bytes);
+                if((prevKernel||prevUser)&&cpuStatus>=0){
                     const ULONGLONG total=(kernel-prevKernel)+(user-prevUser), idleDelta=idle-prevIdle;
                     const int usage=total?int(std::clamp(100.0*(double(total-idleDelta)/double(total)),0.0,100.0)+0.5):0;
+                    std::vector<int> logicalUse(curCpu.size(),-1);
+                    if(prevCpu.size()==curCpu.size()){
+                        for(size_t i=0;i<curCpu.size();++i){
+                            const auto& now=curCpu[i];const auto& before=prevCpu[i];
+                            const LONGLONG idleD=now.IdleTime.QuadPart-before.IdleTime.QuadPart;
+                            const LONGLONG kernelD=now.KernelTime.QuadPart-before.KernelTime.QuadPart;
+                            const LONGLONG userD=now.UserTime.QuadPart-before.UserTime.QuadPart;
+                            const LONGLONG totalD=kernelD+userD;
+                            if(totalD>0) logicalUse[i]=int(std::clamp(100.0*(double(totalD-idleD)/double(totalD)),0.0,100.0)+0.5);
+                        }
+                    }
                     std::wstringstream cpuUse;
                     cpuUse<<L"Overall CPU utilisation: "<<usage<<L"%\r\n";
                     cpuUse<<L"Per-core / logical-thread utilisation:\r\n";
-                    // Windows' aggregate sample is available here today. Show the
-                    // real physical-core -> logical-processor topology now; individual
-                    // utilisation samples are populated as sampling support is added.
                     const auto& topology=cpu_.coreLogicalProcessors();
                     for(size_t core=0;core<topology.size();++core){
-                        cpuUse<<L"  Physical Core "<<core;
-                        if(topology[core].empty()) cpuUse<<L": logical processor mapping unavailable";
-                        cpuUse<<L"\r\n";
-                        for(int lp:topology[core])
-                            cpuUse<<L"    Logical Processor "<<lp<<L": sampling...\r\n";
+                        cpuUse<<L"  Physical Core "<<core<<L"\r\n";
+                        for(int lp:topology[core]){
+                            cpuUse<<L"    Logical Processor "<<lp<<L": ";
+                            if(lp>=0&&size_t(lp)<logicalUse.size()&&logicalUse[lp]>=0)cpuUse<<logicalUse[lp]<<L"%";
+                            else cpuUse<<L"sampling...";
+                            cpuUse<<L"\r\n";
+                        }
                     }
                     SetWindowTextW(cpuUsageText_,cpuUse.str().c_str());
                 }
+                if(cpuStatus>=0)prevCpu=std::move(curCpu);
                 prevIdle=idle;prevKernel=kernel;prevUser=user;
             }
 
