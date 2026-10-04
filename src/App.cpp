@@ -59,6 +59,13 @@ std::wstring utf8ToWide(const std::string& s) {
     MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), w.data(), n);
     return w;
 }
+std::string wideToUtf8(const std::wstring& w) {
+    if (w.empty()) return {};
+    int n=WideCharToMultiByte(CP_UTF8,0,w.data(),static_cast<int>(w.size()),nullptr,0,nullptr,nullptr);
+    std::string s(n,0);
+    WideCharToMultiByte(CP_UTF8,0,w.data(),static_cast<int>(w.size()),s.data(),n,nullptr,nullptr);
+    return s;
+}
 
 struct GpuSample { std::wstring name; LUID luid{}; SIZE_T dedicatedBytes=0; int utilisation=-1; };
 
