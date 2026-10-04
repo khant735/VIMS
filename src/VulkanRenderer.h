@@ -20,6 +20,7 @@ public:
     bool ready() const { return device_ != VK_NULL_HANDLE; }
     const char* gpuName() const { return gpuName_; }
     bool gpuLuid(LUID& luid) const;
+    VkPhysicalDevice physicalDevice() const { return physical_; }
 
 private:
     HWND hwnd_ = nullptr;
