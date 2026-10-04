@@ -657,12 +657,22 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 report<<L"GPU "<<i<<L": "<<g.name<<L"\r\n  DXGI detection: PASS\r\n";
                 report<<L"  Adapter type: "<<(g.dedicatedBytes?L"dedicated/local-memory":L"integrated/shared-memory")<<L"\r\n";
                 if(selected){
+                    // Keep the backend/device identity inside the rendered preview itself.
+                    // A child overlay remains visible above either Vulkan or DXGI presentation,
+                    // unlike the main title/status bar which can be outside a captured scene.
+                    HWND renderId=CreateWindowExW(WS_EX_TRANSPARENT,L"STATIC",L"",WS_CHILD|WS_VISIBLE|SS_LEFT,
+                        18,18,760,52,view_,nullptr,GetModuleHandleW(nullptr),nullptr);
+                    HFONT renderIdFont=CreateFontW(22,0,0,0,FW_BOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
+                        OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH|FF_DONTCARE,L"Segoe UI");
+                    SendMessageW(renderId,WM_SETFONT,(WPARAM)renderIdFont,TRUE);
                     // Make the calibration scene visibly own the preview while it runs.
                     // WM_PAINT/WM_ERASEBKGND from the child view can otherwise repaint over
                     // freshly presented Vulkan frames while this synchronous test pumps messages.
                     {
                         std::wstring sceneTitle=L"VIMS Render Scene - Vulkan - "+g.name;
                         SetWindowTextW(hwnd_,sceneTitle.c_str());
+                        SetWindowTextW(renderId,(L"Backend: Vulkan    GPU/Chipset: "+g.name).c_str());
+                        SetWindowPos(renderId,HWND_TOP,18,18,760,52,SWP_SHOWWINDOW);
                     }
                     setStatus((L"3D Vulkan self-test: Vulkan | "+g.name+L" | rendering two gears...").c_str());
                     RedrawWindow(view_,nullptr,nullptr,RDW_INVALIDATE|RDW_UPDATENOW);
@@ -707,6 +717,9 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                         {
                             std::wstring sceneTitle=L"VIMS Render Scene - Direct3D 11 - "+d3d.gpuName();
                             SetWindowTextW(hwnd_,sceneTitle.c_str());
+                            SetWindowTextW(renderId,(L"Backend: Direct3D 11    GPU/Chipset: "+d3d.gpuName()).c_str());
+                            SetWindowPos(renderId,HWND_TOP,18,18,760,52,SWP_SHOWWINDOW);
+                            RedrawWindow(renderId,nullptr,nullptr,RDW_INVALIDATE|RDW_UPDATENOW);
                             setStatus((L"3D Direct3D 11 self-test: Direct3D 11 | "+d3d.gpuName()+L" | rendering two gears...").c_str());
                         }
                         const ULONGLONG d3dStart=GetTickCount64();unsigned d3dFrames=0;
@@ -733,7 +746,11 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                         vulkanReady_=true;
                         if(!image_.empty())renderer_.setImage(image_);
                         SetWindowTextW(hwnd_,L"Vulkan Image Mask Studio");
+                        if(renderId){DestroyWindow(renderId);renderId=nullptr;}
+                        if(renderIdFont){DeleteObject(renderIdFont);renderIdFont=nullptr;}
                     }catch(const std::exception& e){
+                        if(renderId){DestroyWindow(renderId);renderId=nullptr;}
+                        if(renderIdFont){DeleteObject(renderIdFont);renderIdFont=nullptr;}
                         report<<L"  Vulkan restore after D3D11: FAILED - "<<widen(e.what())<<L"\r\n";
                     }
                 }
