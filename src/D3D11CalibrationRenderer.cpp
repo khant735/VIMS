@@ -39,7 +39,7 @@ bool D3D11CalibrationRenderer::initialize(HWND hwnd,std::wstring& error){
 bool D3D11CalibrationRenderer::draw(float seconds){
     if(!device_)return false;RECT r{};GetClientRect(hwnd_,&r);if(r.right<=0||r.bottom<=0)return false;float clear[]={.025f,.035f,.055f,1};context_->OMSetRenderTargets(1,&rtv_,dsv_);context_->ClearRenderTargetView(rtv_,clear);context_->ClearDepthStencilView(dsv_,D3D11_CLEAR_DEPTH,1,0);
     D3D11_VIEWPORT vp{0,0,(float)r.right,(float)r.bottom,0,1};context_->RSSetViewports(1,&vp);UINT stride=sizeof(V),off=0;context_->IASetVertexBuffers(0,1,&vb_,&stride,&off);context_->IASetInputLayout(layout_);context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);context_->VSSetShader(vs_,nullptr,0);context_->PSSetShader(ps_,nullptr,0);
-    float c=cosf(seconds),s=sinf(seconds);C x{{c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE map{};context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&map);memcpy(map.pData,&x,sizeof(x));context_->Unmap(cb_,0);context_->VSSetConstantBuffers(0,1,&cb_);context_->Draw(216,0);return SUCCEEDED(swap_->Present(1,0));
+    float c=cosf(seconds),s=sinf(seconds);C x{{c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE map{};context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&map);memcpy(map.pData,&x,sizeof(x));context_->Unmap(cb_,0);context_->VSSetConstantBuffers(0,1,&cb_);context_->Draw(336,0);return SUCCEEDED(swap_->Present(1,0));
 }
 void D3D11CalibrationRenderer::shutdown(){if(context_)context_->ClearState();IUnknown* p=nullptr;
 #define R(x) p=(IUnknown*)x;rel(p);x=nullptr
