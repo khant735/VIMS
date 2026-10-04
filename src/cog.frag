@@ -22,14 +22,14 @@ void main(){
     // This is a genuine Vulkan sampled texture. Texture luminance provides
     // restrained brushed-metal variation while the diagnostic tint identifies
     // each gear independently.
-    vec3 texel=texture(cogTexture,uv*3.0).rgb;
+    vec3 texel=texture(cogTexture,uv*5.0).rgb;
     float metal=dot(texel,vec3(0.2126,0.7152,0.0722));
-    vec3 base=tint*mix(0.82,1.08,metal);
+    vec3 base=tint*mix(0.94,1.04,metal);
 
     float diffuse=0.38+0.62*ndl;
-    float roughness=mix(0.38,0.24,metal);
+    float roughness=mix(0.34,0.27,metal);
     float shininess=mix(28.0,58.0,1.0-roughness);
-    float spec=pow(ndh,shininess)*mix(0.16,0.34,metal);
+    float spec=pow(ndh,shininess)*mix(0.18,0.27,metal);
     float rim=pow(1.0-max(dot(N,V),0.0),3.0)*0.07;
 
     vec3 color=base*diffuse;
