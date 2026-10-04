@@ -624,7 +624,20 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
             // menu, avoiding a second permanent settings panel.
             HMENU resolutionMenu=CreatePopupMenu();
             if(!resolutionMenu){setStatus(L"Could not create resolution selector.");return 0;}
-            for(unsigned i=0;i<sizeof(modes)/sizeof(modes[0]);++i)AppendMenuW(resolutionMenu,MF_STRING,50000+i,modes[i].name);
+            // Vulkan's framebuffer limits are device-specific.  Do not offer a
+            // workload the active physical device cannot legally create.
+            VkPhysicalDeviceProperties calProps{};
+            VkPhysicalDevice activePhysical=renderer_.physicalDevice();
+            if(activePhysical!=VK_NULL_HANDLE)vkGetPhysicalDeviceProperties(activePhysical,&calProps);
+            const uint32_t maxFbW=activePhysical!=VK_NULL_HANDLE?calProps.limits.maxFramebufferWidth:0;
+            const uint32_t maxFbH=activePhysical!=VK_NULL_HANDLE?calProps.limits.maxFramebufferHeight:0;
+            unsigned availableModes=0;
+            for(unsigned i=0;i<sizeof(modes)/sizeof(modes[0]);++i){
+                const bool supported=maxFbW&&maxFbH&&uint32_t(modes[i].w)<=maxFbW&&uint32_t(modes[i].h)<=maxFbH;
+                AppendMenuW(resolutionMenu,MF_STRING|(supported?0:MF_GRAYED),50000+i,modes[i].name);
+                if(supported)++availableModes;
+            }
+            if(!availableModes){DestroyMenu(resolutionMenu);setStatus(L"Active Vulkan GPU reports no compatible calibration framebuffer resolutions.");return 0;}
             POINT pt{};GetCursorPos(&pt);
             const UINT pick=TrackPopupMenu(resolutionMenu,TPM_RETURNCMD|TPM_NONOTIFY|TPM_LEFTALIGN|TPM_TOPALIGN,pt.x,pt.y,0,hwnd_,nullptr);
             DestroyMenu(resolutionMenu);
@@ -635,7 +648,8 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
             LUID active{};const bool hasActive=vulkanReady_&&renderer_.gpuLuid(active);
             std::wstringstream report;report<<L"VIMS Render Test / Calibration\r\n\r\n";
             report<<L"Target resolution: "<<modes[chosen].name<<L"\r\n";
-            report<<L"Requested framebuffer: "<<targetW<<L" x "<<targetH<<L"\r\n\r\n";
+            report<<L"Requested framebuffer: "<<targetW<<L" x "<<targetH<<L"\r\n";
+            report<<L"GPU framebuffer limit: "<<maxFbW<<L" x "<<maxFbH<<L"\r\n\r\n";
             if(adapters.empty()) report<<L"No hardware GPU is exposed to Windows/DXGI. A firmware-disabled or driver-disabled iGPU cannot be render-tested.\r\n";
             for(size_t i=0;i<adapters.size();++i){
                 const auto& g=adapters[i];const bool selected=hasActive&&g.luid.HighPart==active.HighPart&&g.luid.LowPart==active.LowPart;
