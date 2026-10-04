@@ -637,10 +637,9 @@ void App::beginOperation(const std::wstring& label,int percent){
     RedrawWindow(panelContent_,nullptr,nullptr,RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW);
 }
 void App::updateOperation(const std::wstring& label,int percent){
+    // The operation label owns the live title/percentage. The detail box is
+    // reserved for stage text so the same progress string is never repeated.
     SetWindowTextW(operationLabel_,label.c_str());
-    if(HWND detail=GetDlgItem(panelContent_,IDC_OPERATION_DETAIL)) SetWindowTextW(detail,label.c_str());
-    // Progress ticks belong in the title/bar, not in the activity history.
-    // The log is reserved for meaningful stage/result messages from setStatus().
     if(percent>=0)SendMessageW(operationProgress_,PBM_SETPOS,std::clamp(percent,0,100),0);
     RedrawWindow(panelContent_,nullptr,nullptr,RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW);
 }
