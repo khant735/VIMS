@@ -5,10 +5,19 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
+#include <cwctype>
 
 struct V { float x,y,z,r,g,b; };
 struct C { float m[16]; };
 static void rel(IUnknown*&p){if(p){p->Release();p=nullptr;}}
+static void addTextBars(std::vector<V>& out,const std::wstring& text,float x,float y,float scale){
+    static const unsigned short glyphs[37]={
+        0x7B6F,0x2492,0x73E7,0x73CF,0x5BC9,0x79CF,0x79EF,0x7249,0x7BEF,0x7BCF,
+        0x7BED,0x6BAE,0x7927,0x6B6E,0x79E7,0x79E4,0x792F,0x5BED,0x7249,0x124E,0x5AAD,0x4927,0x5F6D,0x5B6D,0x7B6F,0x7BE4,0x7B6B,0x7BEA,0x79CF,0x7248,0x5B6F,0x5B6A,0x5F7D,0x5AAD,0x5AA4,0x72E7,0};
+    auto bit=[&](wchar_t ch,int r,int col){int idx=-1;if(ch>=L'0'&&ch<=L'9')idx=ch-L'0';else if(ch>=L'A'&&ch<=L'Z')idx=10+ch-L'A';if(idx<0)return false;return (glyphs[idx]>>(14-(r*3+col)))&1;};
+    float px=x;for(wchar_t raw:text){wchar_t ch=(wchar_t)towupper(raw);if(ch==L' '){px+=scale*2.5f;continue;}if(ch==L':'||ch==L'-'||ch==L'/'){px+=scale*2;continue;}
+        for(int r=0;r<5;r++)for(int col=0;col<3;col++)if(bit(ch,r,col)){float x0=px+col*scale,y0=y-r*scale,x1=x0+scale*.82f,y1=y0-scale*.82f;float z=-.9f;V a{x0,y0,z,1,1,1},b{x1,y0,z,1,1,1},cc{x1,y1,z,1,1,1},d{x0,y1,z,1,1,1};out.insert(out.end(),{a,b,cc,a,cc,d});}px+=scale*3.8f;}
+}
 D3D11CalibrationRenderer::~D3D11CalibrationRenderer(){shutdown();}
 bool D3D11CalibrationRenderer::createTargets(){
     ID3D11Texture2D* back=nullptr;if(FAILED(swap_->GetBuffer(0,__uuidof(ID3D11Texture2D),(void**)&back)))return false;
@@ -39,7 +48,12 @@ bool D3D11CalibrationRenderer::initialize(HWND hwnd,std::wstring& error){
 bool D3D11CalibrationRenderer::draw(float seconds){
     if(!device_)return false;RECT r{};GetClientRect(hwnd_,&r);if(r.right<=0||r.bottom<=0)return false;float clear[]={.025f,.035f,.055f,1};context_->OMSetRenderTargets(1,&rtv_,dsv_);context_->ClearRenderTargetView(rtv_,clear);context_->ClearDepthStencilView(dsv_,D3D11_CLEAR_DEPTH,1,0);
     D3D11_VIEWPORT vp{0,0,(float)r.right,(float)r.bottom,0,1};context_->RSSetViewports(1,&vp);UINT stride=sizeof(V),off=0;context_->IASetVertexBuffers(0,1,&vb_,&stride,&off);context_->IASetInputLayout(layout_);context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);context_->VSSetShader(vs_,nullptr,0);context_->PSSetShader(ps_,nullptr,0);
-    float c=cosf(seconds),s=sinf(seconds);C x{{c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE map{};context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&map);memcpy(map.pData,&x,sizeof(x));context_->Unmap(cb_,0);context_->VSSetConstantBuffers(0,1,&cb_);context_->Draw(336,0);return SUCCEEDED(swap_->Present(1,0));
+    float c=cosf(seconds),s=sinf(seconds);C x{{c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE map{};context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&map);memcpy(map.pData,&x,sizeof(x));context_->Unmap(cb_,0);context_->VSSetConstantBuffers(0,1,&cb_);context_->Draw(336,0);
+    if(!identityBackend_.empty()){
+        std::wstring label=identityBackend_+L"  "+identityGpu_;std::vector<V> tv;addTextBars(tv,label,-.96f,.91f,.014f);
+        if(!tv.empty()){ID3D11Buffer* tb=nullptr;D3D11_BUFFER_DESC td{};td.ByteWidth=(UINT)(tv.size()*sizeof(V));td.Usage=D3D11_USAGE_IMMUTABLE;td.BindFlags=D3D11_BIND_VERTEX_BUFFER;D3D11_SUBRESOURCE_DATA ti{tv.data()};if(SUCCEEDED(device_->CreateBuffer(&td,&ti,&tb))){UINT ts=sizeof(V),to=0;context_->IASetVertexBuffers(0,1,&tb,&ts,&to);C id{{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE tm{};if(SUCCEEDED(context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&tm))){memcpy(tm.pData,&id,sizeof(id));context_->Unmap(cb_,0);context_->Draw((UINT)tv.size(),0);}tb->Release();}}
+    }
+    return SUCCEEDED(swap_->Present(1,0));
 }
 void D3D11CalibrationRenderer::shutdown(){if(context_)context_->ClearState();IUnknown* p=nullptr;
 #define R(x) p=(IUnknown*)x;rel(p);x=nullptr
