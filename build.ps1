@@ -29,8 +29,8 @@ foreach ($spec in @(@('cog.vert.spv','kCogVertSpv'),@('cog.frag.spv','kCogFragSp
     $shaderText += "inline constexpr size_t $($spec[1])Words = sizeof($($spec[1]))/sizeof(uint32_t);`r`n"
 }
 [IO.File]::WriteAllText($shaderHeader,$shaderText,[Text.UTF8Encoding]::new($false))
-$sources = @('main','App','VulkanRenderer','RenderCalibration','SegmentationEngine','LearningStore','WicImage','CpuTopology','CompoundMask','PoseGif','CrashLog') | ForEach-Object { Join-Path $PSScriptRoot "src/$_.cpp" }
-$compilerArgs = @('-std=c++20','-O2','-Wno-macro-redefined','-DUNICODE','-D_UNICODE','-DNOMINMAX','-DWIN32_LEAN_AND_MEAN','-DVK_USE_PLATFORM_WIN32_KHR',"-I$vkInclude","-I$ortInclude") + $sources + @($vkLib,'-lcomdlg32','-lshell32','-luser32','-lgdi32','-lole32','-lwindowscodecs','-luuid','-lwinhttp','-lbcrypt','-lpdh','-lntdll','-ldxgi','-ldxguid','-lcomctl32','-municode','-mwindows','-o',$exe)
+$sources = @('main','App','VulkanRenderer','D3D11CalibrationRenderer','RenderCalibration','SegmentationEngine','LearningStore','WicImage','CpuTopology','CompoundMask','PoseGif','CrashLog') | ForEach-Object { Join-Path $PSScriptRoot "src/$_.cpp" }
+$compilerArgs = @('-std=c++20','-O2','-Wno-macro-redefined','-DUNICODE','-D_UNICODE','-DNOMINMAX','-DWIN32_LEAN_AND_MEAN','-DVK_USE_PLATFORM_WIN32_KHR',"-I$vkInclude","-I$ortInclude") + $sources + @($vkLib,'-lcomdlg32','-lshell32','-luser32','-lgdi32','-lole32','-lwindowscodecs','-luuid','-lwinhttp','-lbcrypt','-lpdh','-lntdll','-ldxgi','-ldxguid','-ld3d11','-ld3dcompiler','-lcomctl32','-municode','-mwindows','-o',$exe)
 & $compiler @compilerArgs
 if ($LASTEXITCODE -ne 0) { throw "Compiler returned exit code $LASTEXITCODE" }
 # The Vulkan 3D calibration pipeline loads its SPIR-V modules beside the EXE.
