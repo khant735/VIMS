@@ -21,6 +21,15 @@ $sources = @('main','App','VulkanRenderer','RenderCalibration','SegmentationEngi
 $compilerArgs = @('-std=c++20','-O2','-Wno-macro-redefined','-DUNICODE','-D_UNICODE','-DNOMINMAX','-DWIN32_LEAN_AND_MEAN','-DVK_USE_PLATFORM_WIN32_KHR',"-I$vkInclude","-I$ortInclude") + $sources + @($vkLib,'-lcomdlg32','-lshell32','-luser32','-lgdi32','-lole32','-lwindowscodecs','-luuid','-lwinhttp','-lbcrypt','-lpdh','-lntdll','-ldxgi','-ldxguid','-lcomctl32','-municode','-mwindows','-o',$exe)
 & $compiler @compilerArgs
 if ($LASTEXITCODE -ne 0) { throw "Compiler returned exit code $LASTEXITCODE" }
+# The Vulkan 3D calibration pipeline loads its SPIR-V modules beside the EXE.
+# Copy them here (after the build output directory exists) so local builds and
+# GitHub Actions packages have identical runtime layout.
+foreach ($shader in @('cog.vert.spv','cog.frag.spv')) {
+    $shaderPath = Join-Path $PSScriptRoot "src/$shader"
+    if (Test-Path -LiteralPath $shaderPath -PathType Leaf) { Copy-Item -LiteralPath $shaderPath -Destination $output -Force }
+    else { Write-Warning "Render-test shader not copied: $shaderPath" }
+}
+
 foreach ($dll in @(
     (Join-Path $env:LLVM_MINGW_ROOT 'x86_64-w64-mingw32/bin/libc++.dll'),
     (Join-Path $env:LLVM_MINGW_ROOT 'x86_64-w64-mingw32/bin/libunwind.dll'),
