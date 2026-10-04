@@ -16,6 +16,9 @@ public:
     // Real Vulkan graphics-pipeline calibration scene: two extruded 3D gears,
     // depth testing, directional lighting and an orbiting perspective camera.
     bool drawGearCalibration(float seconds, uint32_t targetWidth=0, uint32_t targetHeight=0);
+    // Measures the selected off-screen raster workload without swapchain
+    // acquire/present, so the result is not capped by display refresh/VSync.
+    double benchmarkGearCalibration(float seconds, uint32_t targetWidth, uint32_t targetHeight, unsigned milliseconds=2000);
     void resized();
     bool ready() const { return device_ != VK_NULL_HANDLE; }
     const char* gpuName() const { return gpuName_; }
