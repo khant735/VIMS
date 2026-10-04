@@ -677,7 +677,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     {
                         std::wstring sceneTitle=L"VIMS Render Scene - Vulkan - "+g.name;
                         SetWindowTextW(hwnd_,sceneTitle.c_str());
-                        renderer_.setCalibrationIdentity("Vulkan",wideToUtf8(g.name));
+                        renderer_.setCalibrationIdentity("VULKAN",wideToUtf8(g.name));
                     }
                     setStatus((L"3D Vulkan self-test: Vulkan | "+g.name+L" | rendering two gears...").c_str());
                     RedrawWindow(view_,nullptr,nullptr,RDW_INVALIDATE|RDW_UPDATENOW);
@@ -722,7 +722,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                         {
                             std::wstring sceneTitle=L"VIMS Render Scene - Direct3D 11 - "+d3d.gpuName();
                             SetWindowTextW(hwnd_,sceneTitle.c_str());
-                            d3d.setIdentity(L"Direct3D 11",d3d.gpuName());
+                            d3d.setIdentity(L"D3D11",d3d.gpuName());
                             setStatus((L"3D Direct3D 11 self-test: Direct3D 11 | "+d3d.gpuName()+L" | rendering two gears...").c_str());
                         }
                         const ULONGLONG d3dStart=GetTickCount64();unsigned d3dFrames=0;
