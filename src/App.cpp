@@ -322,11 +322,12 @@ void App::layout() {
     // visible above the Vulkan surface instead of consuming the right panel.
     const int topButtonH=S(30), topGap=S(8);
     int topX=S(196);
-    const int openW=S(120), renderW=S(190), diagW=S(150);
-    SetParent(openBtn_,hwnd_);SetParent(gpuSelfTestBtn_,hwnd_);SetParent(diagnosticsBtn_,hwnd_);
+    const int openW=S(120), renderW=S(190), diagW=S(150), gifW=S(185);
+    SetParent(openBtn_,hwnd_);SetParent(gpuSelfTestBtn_,hwnd_);SetParent(diagnosticsBtn_,hwnd_);SetParent(poseGifBtn_,hwnd_);
     MoveWindow(openBtn_,topX,S(9),openW,topButtonH,TRUE); topX+=openW+topGap;
     MoveWindow(gpuSelfTestBtn_,topX,S(9),renderW,topButtonH,TRUE); topX+=renderW+topGap;
-    MoveWindow(diagnosticsBtn_,topX,S(9),diagW,topButtonH,TRUE);
+    MoveWindow(diagnosticsBtn_,topX,S(9),diagW,topButtonH,TRUE); topX+=diagW+topGap;
+    MoveWindow(poseGifBtn_,topX,S(9),gifW,topButtonH,TRUE);
 
     RECT existingPanel{};GetWindowRect(rightPanel_,&existingPanel);
     if(existingPanel.right-existingPanel.left!=cw-vw||existingPanel.bottom-existingPanel.top!=ch)
@@ -415,7 +416,7 @@ void App::layout() {
     place(cutoutCheck_,x,y,w,S(22)); y+=S(24);
     place(exportBtn_,x,y,w,btn);y+=S(34);
     place(exportAllBtn_,x,y,w,btn);y+=S(34);
-    place(poseGifBtn_,x,y,w,btn);y+=S(34);
+    // Pose GIF export lives in the top preview toolbar.
     panelContentHeight_=y+pad;
     panelScroll_=std::clamp(panelScroll_,0,std::max(0,panelContentHeight_-ch));
     SetWindowPos(panelContent_,nullptr,0,-panelScroll_,contentWidth,panelContentHeight_,
