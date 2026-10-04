@@ -680,9 +680,11 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                         renderer_.setCalibrationIdentity("VULKAN",wideToUtf8(g.name));
                     }
                     setStatus((L"3D Vulkan self-test: Vulkan | "+g.name+L" | rendering two gears...").c_str());
-                    RedrawWindow(view_,nullptr,nullptr,RDW_INVALIDATE|RDW_UPDATENOW);
+                    // Do not ask GDI to repaint the swap-chain HWND immediately before
+                    // the Vulkan loop. On some runs that paint can win the first visible
+                    // frame and make the Vulkan phase appear to have been skipped.
                     const ULONGLONG start=GetTickCount64();unsigned frames=0;
-                    while(GetTickCount64()-start<6000){
+                    while(GetTickCount64()-start<8000){
                         const float t=float(GetTickCount64()-start)/1000.0f;
                         if(renderer_.drawGearCalibration(t,(uint32_t)targetW,(uint32_t)targetH))++frames;
                         MSG msg{};
@@ -726,7 +728,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                             setStatus((L"3D Direct3D 11 self-test: Direct3D 11 | "+d3d.gpuName()+L" | rendering two gears...").c_str());
                         }
                         const ULONGLONG d3dStart=GetTickCount64();unsigned d3dFrames=0;
-                        while(GetTickCount64()-d3dStart<3000){
+                        while(GetTickCount64()-d3dStart<6000){
                             const float t=float(GetTickCount64()-d3dStart)/1000.0f;
                             if(d3d.draw(t))++d3dFrames;
                             MSG msg{};
