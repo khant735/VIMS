@@ -6,6 +6,12 @@ layout(set=0,binding=0) uniform sampler2D cogTexture;
 layout(location=0) out vec4 outColor;
 layout(push_constant) uniform PC { mat4 mvp; mat4 model; vec4 material; } pc;
 
+float hash21(vec2 q){
+    q=fract(q*vec2(123.34,456.21));
+    q+=dot(q,q+45.32);
+    return fract(q.x*q.y);
+}
+
 void main(){
     int m=int(pc.material.w+0.5);
     vec3 N=normalize(n);
@@ -14,26 +20,37 @@ void main(){
     vec3 H=normalize(L+V);
     float ndl=max(dot(N,L),0.0);
     float ndh=max(dot(N,H),0.0);
+    float rim=pow(1.0-max(dot(N,V),0.0),3.0);
 
-    vec3 tint=m==0 ? vec3(0.96,0.34,0.045)
-             : m==1 ? vec3(0.045,0.28,0.98)
-                    : vec3(0.62,0.66,0.72);
+    vec3 base;
+    float spec;
+    vec3 specColor;
 
-    // This is a genuine Vulkan sampled texture. Texture luminance provides
-    // restrained brushed-metal variation while the diagnostic tint identifies
-    // each gear independently.
-    vec3 texel=texture(cogTexture,uv*5.0).rgb;
-    float metal=dot(texel,vec3(0.2126,0.7152,0.0722));
-    vec3 base=tint*mix(0.94,1.04,metal);
+    if(m==0){
+        // Red-stained wood cog: broad organic grain with restrained highlights.
+        float grain=sin(p.x*18.0 + sin(p.y*5.0)*2.2 + sin(p.x*3.0+p.y*2.0)*1.4);
+        float fine=sin(p.x*47.0 + p.y*7.0)*0.35;
+        float wood=0.5+0.5*(grain*0.75+fine*0.25);
+        base=vec3(0.88,0.20,0.025)*mix(0.78,1.08,wood);
+        spec=pow(ndh,22.0)*0.11;
+        specColor=vec3(1.0,0.72,0.45);
+    }else if(m==1){
+        // Blue resin/plastic cog: clean, nearly uniform colour with a smooth dielectric highlight.
+        float micro=(hash21(floor(uv*180.0))-0.5)*0.018;
+        base=vec3(0.025,0.20,0.96)*(1.0+micro);
+        spec=pow(ndh,72.0)*0.34;
+        specColor=vec3(0.88,0.94,1.0);
+    }else{
+        // Silver spindle: the external fine-grain texture is used only for metal.
+        vec3 texel=texture(cogTexture,uv*5.0).rgb;
+        float metal=dot(texel,vec3(0.2126,0.7152,0.0722));
+        base=vec3(0.64,0.68,0.73)*mix(0.88,1.12,metal);
+        spec=pow(ndh,mix(48.0,86.0,metal))*mix(0.30,0.55,metal);
+        specColor=vec3(0.94,0.97,1.0);
+    }
 
-    float diffuse=0.38+0.62*ndl;
-    float roughness=mix(0.34,0.27,metal);
-    float shininess=mix(28.0,58.0,1.0-roughness);
-    float spec=pow(ndh,shininess)*mix(0.18,0.27,metal);
-    float rim=pow(1.0-max(dot(N,V),0.0),3.0)*0.07;
-
-    vec3 color=base*diffuse;
-    color+=vec3(1.0,0.95,0.86)*spec;
-    color+=base*rim;
+    float diffuse=0.36+0.64*ndl;
+    vec3 color=base*diffuse + specColor*spec;
+    color+=base*rim*(m==2 ? 0.14 : 0.055);
     outColor=vec4(clamp(color,0.0,1.0),1.0);
 }
