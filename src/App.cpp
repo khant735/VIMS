@@ -5,6 +5,7 @@
 #include "LearningStore.h"
 #include "PoseGif.h"
 #include "RenderCalibration.h"
+#include "D3D11CalibrationRenderer.h"
 #include <commdlg.h>
 #include <shlobj.h>
 #include <shellapi.h>
@@ -688,7 +689,32 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     if(frames) report<<L"  Presented/display rate: "<<std::fixed<<std::setprecision(1)<<presentedFps<<L" frames/s (VSync/presentation)\r\n";
                     else report<<L"  Presented/display rate: UNAVAILABLE\r\n";
                 }else report<<L"  Vulkan device/render: not tested (renderer currently bound to another adapter)\r\n";
-                report<<L"  DirectML per-adapter compute: pending scheduler implementation\r\n\r\n";
+                report<<L"  DirectML per-adapter compute: pending scheduler implementation\\r\\n";
+                if(i==0){
+                    D3D11CalibrationRenderer d3d;
+                    std::wstring d3dError;
+                    setStatus(L"3D Direct3D 11 self-test: executing native D3D11 renderer...");
+                    if(d3d.initialize(view_,d3dError)){
+                        const ULONGLONG d3dStart=GetTickCount64();unsigned d3dFrames=0;
+                        while(GetTickCount64()-d3dStart<3000){
+                            const float t=float(GetTickCount64()-d3dStart)/1000.0f;
+                            if(d3d.draw(t))++d3dFrames;
+                            MSG msg{};
+                            while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){
+                                if(msg.hwnd==view_&&(msg.message==WM_PAINT||msg.message==WM_ERASEBKGND)){ValidateRect(view_,nullptr);continue;}
+                                TranslateMessage(&msg);DispatchMessageW(&msg);
+                            }
+                        }
+                        const double d3dSeconds=std::max(0.001,double(GetTickCount64()-d3dStart)/1000.0);
+                        report<<L"  Direct3D 11 device: PASS [native hardware renderer]\\r\\n";
+                        report<<L"  Direct3D 11 GPU: "<<d3d.gpuName()<<L"\\r\\n";
+                        report<<L"  Direct3D 11 presented rate: "<<std::fixed<<std::setprecision(1)<<(d3dFrames/d3dSeconds)<<L" frames/s (VSync/presentation)\\r\\n";
+                        d3d.shutdown();
+                    }else{
+                        report<<L"  Direct3D 11 device/render: UNAVAILABLE - "<<d3dError<<L"\\r\\n";
+                    }
+                }
+                report<<L"\\r\\n";
             }
             report<<L"\r\n=PLATFORM COMPATIBILITY PROBES=\r\n\r\n";
             report<<L"These are Windows-side theoretical checks.\r\n";
