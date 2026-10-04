@@ -23,5 +23,18 @@ if ([string]::IsNullOrWhiteSpace($artifactName)) {
 $artifactName = $artifactName.Trim()
 
 Write-Host "Downloading $artifactName from workflow run $runId..."
-& $gh run download $runId --repo khant735/VIMS --name $artifactName
-if ($LASTEXITCODE -ne 0) { throw "GitHub CLI download failed with exit code $LASTEXITCODE." }
+# gh refuses to extract an artifact over files that already exist. Download
+# into a temporary directory, then deliberately replace the installed runtime
+# files so updating an existing VIMS folder is reliable.
+$tempDir = Join-Path $env:TEMP ("VIMS-download-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+try {
+    & $gh run download $runId --repo khant735/VIMS --name $artifactName --dir $tempDir
+    if ($LASTEXITCODE -ne 0) { throw "GitHub CLI download failed with exit code $LASTEXITCODE." }
+    Get-ChildItem -LiteralPath $tempDir -File | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $PSScriptRoot $_.Name) -Force
+        Write-Host "Updated $($_.Name)"
+    }
+} finally {
+    Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+}
