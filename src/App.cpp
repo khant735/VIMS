@@ -108,11 +108,17 @@ void drawActionGlyph(const DRAWITEMSTRUCT* d){
 }
 
 std::wstring lowerCopy(std::wstring v){std::transform(v.begin(),v.end(),v.begin(),[](wchar_t x){return std::towlower(x);});return v;}
-std::array<std::wstring,2> luidTokens(const LUID& l){
-    wchar_t a[64]{},b[64]{};
-    swprintf(a,64,L"luid_0x%08x_0x%08x",(unsigned)l.HighPart,(unsigned)l.LowPart);
-    swprintf(b,64,L"luid_0x%08x_0x%08x",(unsigned)l.LowPart,(unsigned)l.HighPart);
-    return {lowerCopy(a),lowerCopy(b)};
+std::vector<std::wstring> luidTokens(const LUID& l){
+    // GPU Engine instance names are not formatted consistently across Windows/
+    // driver revisions. Accept padded/unpadded hex and both high/low orders.
+    const unsigned hi=static_cast<unsigned>(l.HighPart),lo=static_cast<unsigned>(l.LowPart);
+    std::vector<std::wstring> out;
+    auto add=[&](const wchar_t* fmt,unsigned a,unsigned b){wchar_t s[80]{};swprintf(s,80,fmt,a,b);out.push_back(lowerCopy(s));};
+    add(L"luid_0x%08x_0x%08x",hi,lo); add(L"luid_0x%08x_0x%08x",lo,hi);
+    add(L"luid_0x%x_0x%x",hi,lo); add(L"luid_0x%x_0x%x",lo,hi);
+    add(L"luid_%08x_%08x",hi,lo); add(L"luid_%08x_%08x",lo,hi);
+    add(L"luid_%x_%x",hi,lo); add(L"luid_%x_%x",lo,hi);
+    return out;
 }
 std::vector<GpuSample> queryGpuAdapters(){
     std::vector<GpuSample> out; IDXGIFactory1* factory=nullptr;
@@ -127,7 +133,8 @@ std::vector<GpuSample> queryGpuAdapters(){
     std::vector<unsigned char> mem(bytes);auto* items=(PDH_FMT_COUNTERVALUE_ITEM_W*)mem.data();
     if(PdhGetFormattedCounterArrayW(ctr,PDH_FMT_DOUBLE,&bytes,&n,items)==ERROR_SUCCESS)for(auto& g:out){double busiest=0;bool found=false;auto tokens=luidTokens(g.luid);
         for(DWORD i=0;i<n;++i)if(items[i].szName){auto instance=lowerCopy(items[i].szName);
-            if(instance.find(tokens[0])!=std::wstring::npos||instance.find(tokens[1])!=std::wstring::npos){busiest=std::max(busiest,std::max(0.0,items[i].FmtValue.doubleValue));found=true;}}
+            bool match=false;for(const auto& token:tokens)if(instance.find(token)!=std::wstring::npos){match=true;break;}
+            if(match&&items[i].FmtValue.CStatus==PDH_CSTATUS_VALID_DATA){busiest=std::max(busiest,std::max(0.0,items[i].FmtValue.doubleValue));found=true;}}
         if(found)g.utilisation=(int)(std::clamp(busiest,0.0,100.0)+0.5);
     }
     PdhCloseQuery(q);return out;
@@ -429,7 +436,14 @@ void App::layout() {
     const int cpuUsageH=S(std::max(44,cpuUsageLines*18));
     place(cpuUsageText_,x,y,w,cpuUsageH); y+=cpuUsageH+S(9);
     place(gpuText_,x,y,w,S(66)); y+=S(72);
-    place(gpuUsageText_,x,y,w,S(66)); y+=S(75);
+    HDC gpuDc=GetDC(gpuUsageText_);RECT gpuMeasure{0,0,w,0};
+    HFONT gpuFont=(HFONT)SendMessageW(gpuUsageText_,WM_GETFONT,0,0),gpuOld=nullptr;
+    if(gpuFont)gpuOld=(HFONT)SelectObject(gpuDc,gpuFont);
+    wchar_t gpuBuf[4096]{};GetWindowTextW(gpuUsageText_,gpuBuf,4096);
+    DrawTextW(gpuDc,gpuBuf,-1,&gpuMeasure,DT_CALCRECT|DT_WORDBREAK|DT_LEFT);
+    if(gpuOld)SelectObject(gpuDc,gpuOld);ReleaseDC(gpuUsageText_,gpuDc);
+    const int gpuUsageH=std::max<int>(S(22),static_cast<int>(gpuMeasure.bottom-gpuMeasure.top)+S(4));
+    place(gpuUsageText_,x,y,w,gpuUsageH); y+=gpuUsageH+S(9);
     place(cpuCombo_,x,y,w,S(200)); y+=S(30);
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
     // Open/Render Test/Diagnostics live in the top preview toolbar.
@@ -578,7 +592,8 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
             for(size_t i=0;i<adapters.size();++i){const auto& g=adapters[i];const bool selected=hasActive&&g.luid.HighPart==active.HighPart&&g.luid.LowPart==active.LowPart;
                 if(i){names+=L"\r\n";usage+=L"\r\n";}names+=L"GPU "+std::to_wstring(i)+L": "+g.name;
                 names+=g.dedicatedBytes?L" (dedicated)":L" (integrated/shared)";if(selected)names+=L" [Vulkan active]";
-                usage+=L"GPU "+std::to_wstring(i)+L" utilisation: "+(g.utilisation>=0?std::to_wstring(g.utilisation)+L"%":L"unavailable");}
+                usage+=L"GPU "+std::to_wstring(i)+L" utilisation: "+(g.utilisation>=0?std::to_wstring(g.utilisation)+L"%":L"not reported by Windows GPU Engine counters");
+                if(g.utilisation<0)usage+=L"\r\n  Adapter detected and usable; live load telemetry is unsupported/unmatched on this driver.";}
             if(adapters.empty()){names=L"GPU: no Windows graphics adapters found";usage=L"GPU utilisation: unavailable";}
             SetWindowTextW(gpuText_,names.c_str());SetWindowTextW(gpuUsageText_,usage.c_str());
         }
