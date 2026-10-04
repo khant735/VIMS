@@ -1505,46 +1505,56 @@ static void downloadHttpsFile(const std::wstring& host,const std::wstring& path,
 
 void App::downloadFaceModel() {
     if (downloadingFaceModel_) return;
-    const auto script = exeDir() / L"download_models.ps1";
-    if (!std::filesystem::exists(script)) {
-        showError(L"Model downloader", L"download_models.ps1 is missing beside the application.");
+    const auto modelScript = exeDir() / L"download_models.ps1";
+    const auto shaderScript = exeDir() / L"Download_VIMS_Shaders.ps1";
+    if (!std::filesystem::exists(modelScript) || !std::filesystem::exists(shaderScript)) {
+        std::wstring missing;
+        if (!std::filesystem::exists(modelScript)) missing += L"download_models.ps1\\n";
+        if (!std::filesystem::exists(shaderScript)) missing += L"Download_VIMS_Shaders.ps1\\n";
+        showError(L"Resource downloader", L"The following downloader script(s) are missing beside the application:\\n\\n" + missing);
         return;
     }
     downloadingFaceModel_ = true;
-    beginOperation(L"Downloading / verifying AI models...",-1);
+    beginOperation(L"Downloading / verifying AI models and Vulkan shaders...",-1);
     EnableWindow(faceModelBtn_, FALSE);
-    setStatus(L"Running model downloader... A PowerShell window shows per-model progress.");
-    modelWorker_ = std::jthread([this,script](std::stop_token st) {
-        bool ok=false;
+    setStatus(L"Running model downloader first, then Vulkan shader downloader...");
+    modelWorker_ = std::jthread([this,modelScript,shaderScript](std::stop_token st) {
         const auto logsDir = exeDir() / L"Logs";
-        std::error_code logEc;
-        std::filesystem::create_directories(logsDir, logEc);
-        const auto launchLog = logsDir / L"model_downloader_launch.log";
-        { std::wofstream lf(launchLog, std::ios::trunc); lf << L"Starting PowerShell downloader. Script: " << script.wstring() << L"\n"; }
-        std::wstring cmd=L"& { & '" + script.wstring() + L"' *>&1 | Tee-Object -FilePath '" + (logsDir/L"model_downloader_console.log").wstring() + L"'; exit $LASTEXITCODE }";
-        std::wstring args=L"-NoProfile -ExecutionPolicy Bypass -Command \"" + cmd + L"\"";
-        SHELLEXECUTEINFOW sei{sizeof(sei)};
-        sei.fMask=SEE_MASK_NOCLOSEPROCESS;
-        sei.lpVerb=L"open";
-        sei.lpFile=L"powershell.exe";
-        sei.lpParameters=args.c_str();
-        const auto launchDirectory=exeDir().wstring();
-        sei.lpDirectory=launchDirectory.c_str();
-        sei.nShow=SW_SHOWNORMAL;
-        if (ShellExecuteExW(&sei) && sei.hProcess) {
-            while (!st.stop_requested()) {
+        std::error_code ec; std::filesystem::create_directories(logsDir,ec);
+        { std::wofstream lf(logsDir / L"resource_downloader_launch.log", std::ios::trunc);
+          lf << L"Model script: " << modelScript.wstring() << L"\\nShader script: " << shaderScript.wstring() << L"\\n"; }
+
+        auto runScript = [this,&st](const std::filesystem::path& script,const std::filesystem::path& log) -> bool {
+            if(st.stop_requested()) return false;
+            std::wstring cmd=L"& { & '" + script.wstring() + L"' *>&1 | Tee-Object -FilePath '" + log.wstring() + L"'; exit $LASTEXITCODE }";
+            std::wstring args=L"-NoProfile -ExecutionPolicy Bypass -Command \\"" + cmd + L"\\\"";
+            SHELLEXECUTEINFOW sei{sizeof(sei)}; sei.fMask=SEE_MASK_NOCLOSEPROCESS;
+            sei.lpVerb=L"open"; sei.lpFile=L"powershell.exe"; sei.lpParameters=args.c_str();
+            const auto cwd=exeDir().wstring(); sei.lpDirectory=cwd.c_str(); sei.nShow=SW_SHOWNORMAL;
+            if(!ShellExecuteExW(&sei)||!sei.hProcess) return false;
+            bool ok=false;
+            while(!st.stop_requested()){
                 DWORD wr=WaitForSingleObject(sei.hProcess,250);
-                if (wr==WAIT_OBJECT_0) { DWORD code=1; GetExitCodeProcess(sei.hProcess,&code); ok=(code==0); break; }
+                if(wr==WAIT_OBJECT_0){DWORD code=1;GetExitCodeProcess(sei.hProcess,&code);ok=(code==0);break;}
             }
-            CloseHandle(sei.hProcess);
-        }
-        if (!st.stop_requested()) PostMessageW(hwnd_,WM_FACE_MODEL_DONE,ok?1:0,0);
+            CloseHandle(sei.hProcess); return ok;
+        };
+
+        const bool modelsOk=runScript(modelScript,logsDir/L"model_downloader_console.log");
+        const bool shadersOk=modelsOk&&!st.stop_requested() &&
+            runScript(shaderScript,logsDir/L"shader_downloader_console.log");
+        if(!st.stop_requested()) PostMessageW(hwnd_,WM_FACE_MODEL_DONE,(modelsOk&&shadersOk)?1:0,0);
     });
 }
 
 void App::faceModelDone(bool ok) {
     endOperation();
     downloadingFaceModel_=false; EnableWindow(faceModelBtn_,TRUE); updateFaceModelStatus();
-    if(ok){ setStatus(L"Model download pass completed. Installed models are available to the analysis pipeline."); MessageBoxW(hwnd_,L"The model download pass completed. Check the PowerShell output for any optional models that need retrying.",L"Model pack installed",MB_OK|MB_ICONINFORMATION); }
-    else { setStatus(L"Model pack download/verification failed."); showError(L"Model pack",L"The model downloader could not complete its required models. See model_downloader_launch.log, model_downloader_console.log and model_download_report.txt beside the application."); }
+    if(ok){
+        setStatus(L"AI models and Vulkan shaders downloaded/verified successfully.");
+        MessageBoxW(hwnd_,L"The AI model and Vulkan shader download/verification passes both completed successfully.",L"Resources installed",MB_OK|MB_ICONINFORMATION);
+    } else {
+        setStatus(L"Resource download/verification failed.");
+        showError(L"Resource downloader",L"The model or shader downloader did not complete successfully. See Logs\\resource_downloader_launch.log, Logs\\model_downloader_console.log, Logs\\shader_downloader_console.log, model_download_report.txt and shader_download_report.txt.");
+    }
 }
