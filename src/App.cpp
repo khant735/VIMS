@@ -28,6 +28,7 @@
 #include <winternl.h>
 #include <cmath>
 #include <pdh.h>
+#include <pdhmsg.h>
 #include <dxgi1_2.h>
 #include <cwctype>
 
