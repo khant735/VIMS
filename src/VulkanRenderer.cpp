@@ -511,28 +511,30 @@ void VulkanRenderer::createGearResources(){
     buffer(verts.size()*sizeof(GearVertex),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,gearVertexBuffer_,gearVertexMemory_,verts.data());buffer(inds.size()*4,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,gearIndexBuffer_,gearIndexMemory_,inds.data());
     VkAttachmentDescription at[2]{};at[0].format=swapFormat_;at[0].samples=VK_SAMPLE_COUNT_1_BIT;at[0].loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;at[0].storeOp=VK_ATTACHMENT_STORE_OP_STORE;at[0].initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;at[0].finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;at[1].format=VK_FORMAT_D32_SFLOAT;at[1].samples=VK_SAMPLE_COUNT_1_BIT;at[1].loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;at[1].storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE;at[1].initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;at[1].finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     VkAttachmentReference cr{0,VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},dr{1,VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};VkSubpassDescription sp{};sp.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS;sp.colorAttachmentCount=1;sp.pColorAttachments=&cr;sp.pDepthStencilAttachment=&dr;VkRenderPassCreateInfo ri{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};ri.attachmentCount=2;ri.pAttachments=at;ri.subpassCount=1;ri.pSubpasses=&sp;vkCheck(vkCreateRenderPass(device_,&ri,nullptr,&gearRenderPass_),"Could not create gear render pass.");
-    // Load the calibration material from a real packaged image file (ASCII PPM).
-    // PPM keeps this diagnostic path dependency-free while exercising disk I/O,
-    // image decoding, staging upload, sampling and filtering end-to-end.
+    // Load one real PPM texture for each calibration material and pack the
+    // three images into a GPU atlas: wood, resin/plastic, silver spindle.
     wchar_t texExe[MAX_PATH]{};GetModuleFileNameW(nullptr,texExe,MAX_PATH);
-    std::wstring texturePath(texExe);auto texSlash=texturePath.find_last_of(L"\\/");
-    texturePath=(texSlash==std::wstring::npos?L"":texturePath.substr(0,texSlash+1))+L"cog_metal.ppm";
-    std::ifstream tf(texturePath.c_str());
-    if(!tf) throw std::runtime_error("Missing cog texture: cog_metal.ppm");
-    auto token=[&]()->std::string{
-        std::string s;
-        while(tf>>s){if(!s.empty()&&s[0]=='#'){std::string rest;std::getline(tf,rest);continue;}return s;}
-        return {};
+    std::wstring textureDir(texExe);auto texSlash=textureDir.find_last_of(L"\\/");
+    textureDir=(texSlash==std::wstring::npos?L"":textureDir.substr(0,texSlash+1));
+    auto loadPpm=[&](const wchar_t* name,uint32_t targetW,uint32_t targetH){
+        std::wstring path=textureDir+name;std::ifstream tf(path.c_str());
+        if(!tf) throw std::runtime_error("Missing calibration PPM texture");
+        auto token=[&]()->std::string{std::string s;while(tf>>s){if(!s.empty()&&s[0]=='#'){std::string rest;std::getline(tf,rest);continue;}return s;}return {};};
+        if(token()!="P3") throw std::runtime_error("Invalid calibration texture: expected P3 PPM");
+        uint32_t w=(uint32_t)std::stoul(token()),h=(uint32_t)std::stoul(token()),maxv=(uint32_t)std::stoul(token());
+        if(!w||!h||w>4096||h>4096||!maxv||maxv>65535) throw std::runtime_error("Invalid calibration texture dimensions/range");
+        std::vector<uint8_t> src(size_t(w)*h*4);
+        for(size_t px=0;px<size_t(w)*h;++px){for(int ch=0;ch<3;++ch){auto s=token();if(s.empty())throw std::runtime_error("Truncated calibration texture");unsigned v=(unsigned)std::stoul(s);src[px*4+ch]=(uint8_t)std::min(255u,(v*255u)/maxv);}src[px*4+3]=255;}
+        std::vector<uint8_t> dst(size_t(targetW)*targetH*4);
+        for(uint32_t y=0;y<targetH;++y)for(uint32_t x=0;x<targetW;++x){uint32_t sx=x*w/targetW,sy=y*h/targetH;std::memcpy(&dst[(size_t(y)*targetW+x)*4],&src[(size_t(sy)*w+sx)*4],4);}
+        return dst;
     };
-    if(token()!="P3") throw std::runtime_error("Invalid cog_metal.ppm: expected P3 PPM");
-    const uint32_t TW=(uint32_t)std::stoul(token()),TH=(uint32_t)std::stoul(token());
-    const uint32_t maxv=(uint32_t)std::stoul(token());
-    if(!TW||!TH||TW>4096||TH>4096||maxv==0||maxv>65535) throw std::runtime_error("Invalid cog_metal.ppm dimensions/range");
+    const uint32_t MATW=64,MATH=64,TW=MATW*3,TH=MATH;
+    auto wood=loadPpm(L"cog_wood.ppm",MATW,MATH);
+    auto resin=loadPpm(L"cog_resin.ppm",MATW,MATH);
+    auto metal=loadPpm(L"spindle_metal.ppm",MATW,MATH);
     std::vector<uint8_t> tex(size_t(TW)*TH*4);
-    for(size_t px=0;px<size_t(TW)*TH;++px){
-        for(int ch=0;ch<3;++ch){auto s=token();if(s.empty())throw std::runtime_error("Truncated cog_metal.ppm");unsigned v=(unsigned)std::stoul(s);tex[px*4+ch]=(uint8_t)std::min(255u,(v*255u)/maxv);}
-        tex[px*4+3]=255;
-    }
+    for(uint32_t y=0;y<TH;++y){std::memcpy(&tex[(size_t(y)*TW+0)*4],&wood[size_t(y)*MATW*4],MATW*4);std::memcpy(&tex[(size_t(y)*TW+MATW)*4],&resin[size_t(y)*MATW*4],MATW*4);std::memcpy(&tex[(size_t(y)*TW+MATW*2)*4],&metal[size_t(y)*MATW*4],MATW*4);}
     VkBuffer ts{};VkDeviceMemory tsm{};VkDeviceSize tbytes=tex.size();
     VkBufferCreateInfo tbi{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};tbi.size=tbytes;tbi.usage=VK_BUFFER_USAGE_TRANSFER_SRC_BIT;tbi.sharingMode=VK_SHARING_MODE_EXCLUSIVE;vkCheck(vkCreateBuffer(device_,&tbi,nullptr,&ts),"Could not create gear texture staging buffer.");
     VkMemoryRequirements tmr{};vkGetBufferMemoryRequirements(device_,ts,&tmr);VkMemoryAllocateInfo tma{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};tma.allocationSize=tmr.size;tma.memoryTypeIndex=findMemoryType(tmr.memoryTypeBits,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);vkCheck(vkAllocateMemory(device_,&tma,nullptr,&tsm),"Could not allocate gear texture staging memory.");vkBindBufferMemory(device_,ts,tsm,0);void*tmapped{};vkMapMemory(device_,tsm,0,tbytes,0,&tmapped);std::memcpy(tmapped,tex.data(),tex.size());vkUnmapMemory(device_,tsm);
@@ -565,8 +567,10 @@ bool VulkanRenderer::drawGearCalibration(float seconds,uint32_t targetWidth,uint
     constexpr float smallHalfTooth=3.14159265359f/8.0f;
     const float spin=seconds*1.35f;
     const float smallSpin=-2.0f*spin+smallHalfTooth;
-    // Draw each complete mesh once while the material shader is validated.
-    // Splitting spindle subranges caused the regression/crash on the live RX 580 path.
-    part(leftX, spin,0.0f,gearLargeIndexCount_+gearLargeSpindleIndexCount_,0);
-    part(rightX,smallSpin,1.0f,gearSmallIndexCount_+gearSmallSpindleIndexCount_,gearSmallFirstIndex_);vkCmdEndRenderPass(cmd);vkEndCommandBuffer(cmd);VkPipelineStageFlags wait=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};si.waitSemaphoreCount=1;si.pWaitSemaphores=&imageAvailable_;si.pWaitDstStageMask=&wait;si.commandBufferCount=1;si.pCommandBuffers=&cmd;si.signalSemaphoreCount=1;si.pSignalSemaphores=&renderFinished_;if(vkQueueSubmit(queue_,1,&si,VK_NULL_HANDLE)!=VK_SUCCESS){vkFreeCommandBuffers(device_,commandPool_,1,&cmd);return false;}VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};pi.waitSemaphoreCount=1;pi.pWaitSemaphores=&renderFinished_;pi.swapchainCount=1;pi.pSwapchains=&swapchain_;pi.pImageIndices=&imageIndex;VkResult pr=vkQueuePresentKHR(queue_,&pi);vkQueueWaitIdle(queue_);vkFreeCommandBuffers(device_,commandPool_,1,&cmd);if(pr==VK_ERROR_OUT_OF_DATE_KHR||pr==VK_SUBOPTIMAL_KHR)resized();return pr==VK_SUCCESS||pr==VK_SUBOPTIMAL_KHR;
+    // Draw gear bodies and spindle subranges separately so every physical part
+    // receives its own texture/material, matching the calibration mockup.
+    part(leftX, spin,0.0f,gearLargeIndexCount_,0);
+    part(leftX, spin,2.0f,gearLargeSpindleIndexCount_,gearLargeSpindleFirstIndex_);
+    part(rightX,smallSpin,1.0f,gearSmallIndexCount_,gearSmallFirstIndex_);
+    part(rightX,smallSpin,2.0f,gearSmallSpindleIndexCount_,gearSmallSpindleFirstIndex_);vkCmdEndRenderPass(cmd);vkEndCommandBuffer(cmd);VkPipelineStageFlags wait=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};si.waitSemaphoreCount=1;si.pWaitSemaphores=&imageAvailable_;si.pWaitDstStageMask=&wait;si.commandBufferCount=1;si.pCommandBuffers=&cmd;si.signalSemaphoreCount=1;si.pSignalSemaphores=&renderFinished_;if(vkQueueSubmit(queue_,1,&si,VK_NULL_HANDLE)!=VK_SUCCESS){vkFreeCommandBuffers(device_,commandPool_,1,&cmd);return false;}VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};pi.waitSemaphoreCount=1;pi.pWaitSemaphores=&renderFinished_;pi.swapchainCount=1;pi.pSwapchains=&swapchain_;pi.pImageIndices=&imageIndex;VkResult pr=vkQueuePresentKHR(queue_,&pi);vkQueueWaitIdle(queue_);vkFreeCommandBuffers(device_,commandPool_,1,&cmd);if(pr==VK_ERROR_OUT_OF_DATE_KHR||pr==VK_SUBOPTIMAL_KHR)resized();return pr==VK_SUCCESS||pr==VK_SUBOPTIMAL_KHR;
 }
