@@ -83,6 +83,8 @@ jobs:
           Copy-Item $env:DIRECTML_DLL $out -Force
           $required = @(
             "$out\VulkanImageMaskStudio.exe",
+            "$out\cog.vert.spv",
+            "$out\cog.frag.spv",
             "$out\libc++.dll",
             "$out\libunwind.dll",
             "$out\onnxruntime.dll",
@@ -130,7 +132,10 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: VIMS-${{ github.ref_type == 'tag' && github.ref_name || 'development' }}-Windows-x64-EXE-${{ env.RELEASE_CRC32 }}
-          path: build/Release/VulkanImageMaskStudio.exe
+          path: |
+            build/Release/VulkanImageMaskStudio.exe
+            build/Release/cog.vert.spv
+            build/Release/cog.frag.spv
           if-no-files-found: error
           compression-level: 0
 
