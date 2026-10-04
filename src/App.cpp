@@ -706,15 +706,15 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                             }
                         }
                         const double d3dSeconds=std::max(0.001,double(GetTickCount64()-d3dStart)/1000.0);
-                        report<<L"  Direct3D 11 device: PASS [native hardware renderer]\\r\\n";
-                        report<<L"  Direct3D 11 GPU: "<<d3d.gpuName()<<L"\\r\\n";
-                        report<<L"  Direct3D 11 presented rate: "<<std::fixed<<std::setprecision(1)<<(d3dFrames/d3dSeconds)<<L" frames/s (VSync/presentation)\\r\\n";
+                        report<<L"  Direct3D 11 device: PASS [native hardware renderer]\r\n";
+                        report<<L"  Direct3D 11 GPU: "<<d3d.gpuName()<<L"\r\n";
+                        report<<L"  Direct3D 11 presented rate: "<<std::fixed<<std::setprecision(1)<<(d3dFrames/d3dSeconds)<<L" frames/s (VSync/presentation)\r\n";
                         d3d.shutdown();
                     }else{
-                        report<<L"  Direct3D 11 device/render: UNAVAILABLE - "<<d3dError<<L"\\r\\n";
+                        report<<L"  Direct3D 11 device/render: UNAVAILABLE - "<<d3dError<<L"\r\n";
                     }
                 }
-                report<<L"\\r\\n";
+                report<<L"\r\n";
             }
             report<<L"\r\n=PLATFORM COMPATIBILITY PROBES=\r\n\r\n";
             report<<L"These are Windows-side theoretical checks.\r\n";
