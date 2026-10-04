@@ -675,10 +675,18 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                         }
                     }
                     const double seconds=std::max(0.001,double(GetTickCount64()-start)/1000.0);
+                    const double presentedFps=frames/seconds;
+                    setStatus(L"3D Vulkan self-test: measuring off-screen render throughput...");
+                    const double renderFps=renderer_.benchmarkGearCalibration(float(seconds),(uint32_t)targetW,(uint32_t)targetH,2000);
                     if(!image_.empty())renderer_.setImage(image_);
                     report<<L"  Vulkan device: PASS [active renderer]\r\n";
-                    if(frames) report<<L"  3D Vulkan gear render: PASS ("<<std::fixed<<std::setprecision(1)<<(frames/seconds)<<L" frames/s)\r\n";
-                    else report<<L"  3D Vulkan gear render: UNAVAILABLE (graphics pipeline/shaders not ready)\r\n";
+                    report<<L"  Internal framebuffer: "<<targetW<<L" x "<<targetH<<L"\r\n";
+                    if(renderFps>0.0){
+                        report<<L"  Vulkan render throughput: "<<std::fixed<<std::setprecision(1)<<renderFps<<L" frames/s\r\n";
+                        report<<L"  Average render time: "<<std::fixed<<std::setprecision(3)<<(1000.0/renderFps)<<L" ms/frame\r\n";
+                    }else report<<L"  Vulkan render throughput: UNAVAILABLE\r\n";
+                    if(frames) report<<L"  Presented/display rate: "<<std::fixed<<std::setprecision(1)<<presentedFps<<L" frames/s (VSync/presentation)\r\n";
+                    else report<<L"  Presented/display rate: UNAVAILABLE\r\n";
                 }else report<<L"  Vulkan device/render: not tested (renderer currently bound to another adapter)\r\n";
                 report<<L"  DirectML per-adapter compute: pending scheduler implementation\r\n\r\n";
             }
