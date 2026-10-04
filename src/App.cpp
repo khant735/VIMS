@@ -326,7 +326,7 @@ void App::createUi() {
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_CREATE_PART),instance_,nullptr);
     approveBtn_=CreateWindowW(L"BUTTON",L"Approve mask for learning",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,26,panelContent_,reinterpret_cast<HMENU>(IDC_APPROVE_MASK),instance_,nullptr);
-    faceModelBtn_=CreateWindowW(L"BUTTON",L"Download Core + Face AI Models",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,0,0,100,30,panelContent_,(HMENU)IDC_FACE_MODEL,instance_,nullptr);
+    faceModelBtn_=CreateWindowW(L"BUTTON",L"Download required files!",WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,0,0,100,30,panelContent_,(HMENU)IDC_FACE_MODEL,instance_,nullptr);
     faceModelStatus_=CreateWindowW(L"STATIC",L"",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,100,22,panelContent_,nullptr,instance_,nullptr);
     updateFaceModelStatus();
     refineGroup_=CreateWindowW(L"STATIC",L"Mask Refinement",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,100,100,panelContent_,nullptr,instance_,nullptr);
