@@ -511,15 +511,25 @@ void VulkanRenderer::createGearResources(){
     buffer(verts.size()*sizeof(GearVertex),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,gearVertexBuffer_,gearVertexMemory_,verts.data());buffer(inds.size()*4,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,gearIndexBuffer_,gearIndexMemory_,inds.data());
     VkAttachmentDescription at[2]{};at[0].format=swapFormat_;at[0].samples=VK_SAMPLE_COUNT_1_BIT;at[0].loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;at[0].storeOp=VK_ATTACHMENT_STORE_OP_STORE;at[0].initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;at[0].finalLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;at[1].format=VK_FORMAT_D32_SFLOAT;at[1].samples=VK_SAMPLE_COUNT_1_BIT;at[1].loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;at[1].storeOp=VK_ATTACHMENT_STORE_OP_DONT_CARE;at[1].initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;at[1].finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     VkAttachmentReference cr{0,VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},dr{1,VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};VkSubpassDescription sp{};sp.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS;sp.colorAttachmentCount=1;sp.pColorAttachments=&cr;sp.pDepthStencilAttachment=&dr;VkRenderPassCreateInfo ri{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};ri.attachmentCount=2;ri.pAttachments=at;ri.subpassCount=1;ri.pSubpasses=&sp;vkCheck(vkCreateRenderPass(device_,&ri,nullptr,&gearRenderPass_),"Could not create gear render pass.");
-    // A genuine sampled RGBA texture used by the calibration gears. The pixels
-    // are uploaded through a staging buffer into a device-local VkImage; the
-    // fragment shader accesses it through a combined image sampler descriptor.
-    constexpr uint32_t TW=64,TH=64;std::array<uint8_t,TW*TH*4> tex{};
-    for(uint32_t y=0;y<TH;++y)for(uint32_t x=0;x<TW;++x){
-        float fine=0.5f+0.5f*std::sin(float(x)*1.73f+float(y)*0.31f);
-        float cross=0.5f+0.5f*std::sin(float(x+y)*0.47f);
-        uint8_t g=(uint8_t)std::clamp(150.0f+22.0f*fine+8.0f*cross,0.0f,255.0f);
-        size_t o=(size_t(y)*TW+x)*4;tex[o]=g;tex[o+1]=g;tex[o+2]=g;tex[o+3]=255;
+    // Load the calibration material from a real packaged image file (ASCII PPM).
+    // PPM keeps this diagnostic path dependency-free while exercising disk I/O,
+    // image decoding, staging upload, sampling and filtering end-to-end.
+    const auto texturePath=exeDir_ / L"cog_metal.ppm";
+    std::ifstream tf(texturePath);
+    if(!tf) throw std::runtime_error("Missing cog texture: cog_metal.ppm");
+    auto token=[&]()->std::string{
+        std::string s;
+        while(tf>>s){if(!s.empty()&&s[0]=='#'){std::string rest;std::getline(tf,rest);continue;}return s;}
+        return {};
+    };
+    if(token()!="P3") throw std::runtime_error("Invalid cog_metal.ppm: expected P3 PPM");
+    const uint32_t TW=(uint32_t)std::stoul(token()),TH=(uint32_t)std::stoul(token());
+    const uint32_t maxv=(uint32_t)std::stoul(token());
+    if(!TW||!TH||TW>4096||TH>4096||maxv==0||maxv>65535) throw std::runtime_error("Invalid cog_metal.ppm dimensions/range");
+    std::vector<uint8_t> tex(size_t(TW)*TH*4);
+    for(size_t px=0;px<size_t(TW)*TH;++px){
+        for(int ch=0;ch<3;++ch){auto s=token();if(s.empty())throw std::runtime_error("Truncated cog_metal.ppm");unsigned v=(unsigned)std::stoul(s);tex[px*4+ch]=(uint8_t)std::min(255u,(v*255u)/maxv);}
+        tex[px*4+3]=255;
     }
     VkBuffer ts{};VkDeviceMemory tsm{};VkDeviceSize tbytes=tex.size();
     VkBufferCreateInfo tbi{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};tbi.size=tbytes;tbi.usage=VK_BUFFER_USAGE_TRANSFER_SRC_BIT;tbi.sharingMode=VK_SHARING_MODE_EXCLUSIVE;vkCheck(vkCreateBuffer(device_,&tbi,nullptr,&ts),"Could not create gear texture staging buffer.");
