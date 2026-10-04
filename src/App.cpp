@@ -679,7 +679,12 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     const double presentedFps=frames/seconds;
                     setStatus(L"3D Vulkan self-test: measuring off-screen render throughput...");
                     const double renderFps=renderer_.benchmarkGearCalibration(float(seconds),(uint32_t)targetW,(uint32_t)targetH,2000);
-                    if(!image_.empty())renderer_.setImage(image_);
+                    // Vulkan owns a VkSwapchainKHR for view_. Destroy it before another
+                    // presentation API creates a swap chain for the same HWND. Keeping both
+                    // alive made D3D11 report successful Present calls while Vulkan's surface
+                    // remained the visible owner.
+                    renderer_.shutdown();
+                    vulkanReady_=false;
                     report<<L"  Vulkan device: PASS [active renderer]\r\n";
                     report<<L"  Internal framebuffer: "<<targetW<<L" x "<<targetH<<L"\r\n";
                     if(renderFps>0.0){
@@ -712,6 +717,14 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                         d3d.shutdown();
                     }else{
                         report<<L"  Direct3D 11 device/render: UNAVAILABLE - "<<d3dError<<L"\r\n";
+                    }
+                    // Restore Vulkan after D3D11 has released its DXGI swap chain.
+                    try{
+                        renderer_.initialize(view_);
+                        vulkanReady_=true;
+                        if(!image_.empty())renderer_.setImage(image_);
+                    }catch(const std::exception& e){
+                        report<<L"  Vulkan restore after D3D11: FAILED - "<<widen(e.what())<<L"\r\n";
                     }
                 }
                 report<<L"\r\n";
