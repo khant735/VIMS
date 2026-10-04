@@ -652,6 +652,8 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
             report<<L"Requested framebuffer: "<<targetW<<L" x "<<targetH<<L"\r\n";
             report<<L"GPU framebuffer limit: "<<maxFbW<<L" x "<<maxFbH<<L"\r\n\r\n";
             if(adapters.empty()) report<<L"No hardware GPU is exposed to Windows/DXGI. A firmware-disabled or driver-disabled iGPU cannot be render-tested.\r\n";
+            HWND renderId=nullptr;
+            HFONT renderIdFont=nullptr;
             for(size_t i=0;i<adapters.size();++i){
                 const auto& g=adapters[i];const bool selected=hasActive&&g.luid.HighPart==active.HighPart&&g.luid.LowPart==active.LowPart;
                 report<<L"GPU "<<i<<L": "<<g.name<<L"\r\n  DXGI detection: PASS\r\n";
@@ -660,9 +662,9 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     // Keep the backend/device identity inside the rendered preview itself.
                     // A child overlay remains visible above either Vulkan or DXGI presentation,
                     // unlike the main title/status bar which can be outside a captured scene.
-                    HWND renderId=CreateWindowExW(WS_EX_TRANSPARENT,L"STATIC",L"",WS_CHILD|WS_VISIBLE|SS_LEFT,
+                    renderId=CreateWindowExW(WS_EX_TRANSPARENT,L"STATIC",L"",WS_CHILD|WS_VISIBLE|SS_LEFT,
                         18,18,760,52,view_,nullptr,GetModuleHandleW(nullptr),nullptr);
-                    HFONT renderIdFont=CreateFontW(22,0,0,0,FW_BOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
+                    renderIdFont=CreateFontW(22,0,0,0,FW_BOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
                         OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH|FF_DONTCARE,L"Segoe UI");
                     SendMessageW(renderId,WM_SETFONT,(WPARAM)renderIdFont,TRUE);
                     // Make the calibration scene visibly own the preview while it runs.
