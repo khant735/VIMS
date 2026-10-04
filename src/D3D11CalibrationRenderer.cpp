@@ -16,7 +16,7 @@ static void addTextBars(std::vector<V>& out,const std::wstring& text,float x,flo
         0x7BED,0x6BAE,0x7927,0x6B6E,0x79E7,0x79E4,0x792F,0x5BED,0x7249,0x124E,0x5AAD,0x4927,0x5F6D,0x5B6D,0x7B6F,0x7BE4,0x7B6B,0x7BEA,0x79CF,0x7248,0x5B6F,0x5B6A,0x5F7D,0x5AAD,0x5AA4,0x72E7,0};
     auto bit=[&](wchar_t ch,int r,int col)->bool{int idx=-1;if(ch>=L'0'&&ch<=L'9')idx=ch-L'0';else if(ch>=L'A'&&ch<=L'Z')idx=10+ch-L'A';if(idx<0)return false;return ((glyphs[idx]>>(14-(r*3+col)))&1)!=0;};
     float px=x;for(wchar_t raw:text){wchar_t ch=(wchar_t)towupper(raw);if(ch==L' '){px+=scale*2.5f;continue;}if(ch==L':'||ch==L'-'||ch==L'/'){px+=scale*2;continue;}
-        for(int r=0;r<5;r++)for(int col=0;col<3;col++)if(bit(ch,r,col)){float x0=px+col*scale,y0=y-r*scale,x1=x0+scale*.82f,y1=y0-scale*.82f;float z=-.9f;V a{x0,y0,z,1,1,1},b{x1,y0,z,1,1,1},cc{x1,y1,z,1,1,1},d{x0,y1,z,1,1,1};out.insert(out.end(),{a,b,cc,a,cc,d});}px+=scale*3.8f;}
+        for(int r=0;r<5;r++)for(int col=0;col<3;col++)if(bit(ch,r,col)){float x0=px+col*scale,y0=y-r*scale,x1=x0+scale*.82f,y1=y0-scale*.82f;float z=.5f;V a{x0,y0,z,1,1,1},b{x1,y0,z,1,1,1},cc{x1,y1,z,1,1,1},d{x0,y1,z,1,1,1};out.insert(out.end(),{a,b,cc,a,cc,d});}px+=scale*3.8f;}
 }
 D3D11CalibrationRenderer::~D3D11CalibrationRenderer(){shutdown();}
 bool D3D11CalibrationRenderer::createTargets(){
@@ -55,8 +55,8 @@ bool D3D11CalibrationRenderer::draw(float seconds){
         // glyphs are not, glyph generation/placement is at fault. If it is absent,
         // the HUD draw pass itself is not reaching the presented framebuffer.
         {
-            V q[]={{-.98f,.98f,0,1,0,1},{-.30f,.98f,0,1,0,1},{-.30f,.78f,0,1,0,1},
-                   {-.98f,.98f,0,1,0,1},{-.30f,.78f,0,1,0,1},{-.98f,.78f,0,1,0,1}};
+            V q[]={{-.98f,.98f,.5f,1,0,1},{-.30f,.98f,.5f,1,0,1},{-.30f,.78f,.5f,1,0,1},
+                   {-.98f,.98f,.5f,1,0,1},{-.30f,.78f,.5f,1,0,1},{-.98f,.78f,.5f,1,0,1}};
             ID3D11Buffer* qb=nullptr;D3D11_BUFFER_DESC qd{};qd.ByteWidth=sizeof(q);qd.Usage=D3D11_USAGE_IMMUTABLE;qd.BindFlags=D3D11_BIND_VERTEX_BUFFER;D3D11_SUBRESOURCE_DATA qi{q};
             if(SUCCEEDED(device_->CreateBuffer(&qd,&qi,&qb))){
                 ID3D11DepthStencilState* noDepth=nullptr;D3D11_DEPTH_STENCIL_DESC nd{};nd.DepthEnable=FALSE;nd.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ZERO;nd.DepthFunc=D3D11_COMPARISON_ALWAYS;device_->CreateDepthStencilState(&nd,&noDepth);context_->OMSetDepthStencilState(noDepth,0);
