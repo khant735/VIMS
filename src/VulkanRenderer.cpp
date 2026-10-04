@@ -452,7 +452,7 @@ void appendGear(std::vector<GearVertex>&v,std::vector<uint32_t>&ix,int teeth,flo
 }
 void appendSpindle(std::vector<GearVertex>&v,std::vector<uint32_t>&ix,float radius,float halfZ,int seg=32){
     auto push=[&](float x,float y,float z,float nx,float ny,float nz){
-        float u=.5f+x/(outer*2.4f), vv=.5f+y/(outer*2.4f);
+        float u=.5f+x/(radius*2.4f), vv=.5f+y/(radius*2.4f);
         if(std::abs(nz)<.5f){u=std::atan2(y,x)/6.28318530718f+.5f;vv=(z+halfZ)/(2*halfZ);}
         v.push_back({{x,y,z},{nx,ny,nz},{u,vv}});return uint32_t(v.size()-1);
     };
