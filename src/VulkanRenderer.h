@@ -55,6 +55,9 @@ private:
     VkBuffer gearIndexBuffer_ = VK_NULL_HANDLE;
     VkDeviceMemory gearIndexMemory_ = VK_NULL_HANDLE;
     uint32_t gearIndexCount_ = 0;
+    uint32_t gearLargeIndexCount_ = 0;
+    uint32_t gearSmallFirstIndex_ = 0;
+    uint32_t gearSmallIndexCount_ = 0;
     VkFormat gearDepthFormat_ = VK_FORMAT_UNDEFINED;
     char gpuName_[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE]{};
 
