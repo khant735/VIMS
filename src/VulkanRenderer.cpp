@@ -514,8 +514,10 @@ void VulkanRenderer::createGearResources(){
     // Load the calibration material from a real packaged image file (ASCII PPM).
     // PPM keeps this diagnostic path dependency-free while exercising disk I/O,
     // image decoding, staging upload, sampling and filtering end-to-end.
-    const auto texturePath=exeDir_ / L"cog_metal.ppm";
-    std::ifstream tf(texturePath);
+    wchar_t texExe[MAX_PATH]{};GetModuleFileNameW(nullptr,texExe,MAX_PATH);
+    std::wstring texturePath(texExe);auto texSlash=texturePath.find_last_of(L"\\/");
+    texturePath=(texSlash==std::wstring::npos?L"":texturePath.substr(0,texSlash+1))+L"cog_metal.ppm";
+    std::ifstream tf(texturePath.c_str());
     if(!tf) throw std::runtime_error("Missing cog texture: cog_metal.ppm");
     auto token=[&]()->std::string{
         std::string s;
