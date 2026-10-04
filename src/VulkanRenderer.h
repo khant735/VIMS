@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 #include "Image.h"
 #include <vector>
+#include <string>
 
 class VulkanRenderer {
 public:
@@ -16,6 +17,7 @@ public:
     // Real Vulkan graphics-pipeline calibration scene: two extruded 3D gears,
     // depth testing, directional lighting and an orbiting perspective camera.
     bool drawGearCalibration(float seconds, uint32_t targetWidth=0, uint32_t targetHeight=0);
+    void setCalibrationIdentity(const std::string& backend,const std::string& gpu){ calibrationBackend_=backend; calibrationGpu_=gpu; }
     // Measures the selected off-screen raster workload without swapchain
     // acquire/present, so the result is not capped by display refresh/VSync.
     double benchmarkGearCalibration(float seconds, uint32_t targetWidth, uint32_t targetHeight, unsigned milliseconds=2000);
@@ -80,6 +82,7 @@ private:
     VkImageView gearOffscreenColorView_ = VK_NULL_HANDLE;
     VkFramebuffer gearOffscreenFramebuffer_ = VK_NULL_HANDLE;
     char gpuName_[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE]{};
+    std::string calibrationBackend_, calibrationGpu_;
 
     void createInstance();
     void pickPhysicalDevice();
