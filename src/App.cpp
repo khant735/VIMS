@@ -401,9 +401,9 @@ void App::layout() {
     };
     int x=pad,y=pad,w=available;
     const int row=S(24), btn=S(30), labelW=std::clamp(int(w*.48),S(175),S(245));
-    auto buttonWidth=[&](HWND,int=S(16)){ return S(32); };
-    auto placeButton=[&](HWND button,int xx,int yy,int maxW=w){
-        const int bw=std::min(maxW,buttonWidth(button));
+    auto buttonWidth=[&](HWND,int){ return S(32); };
+    auto placeButton=[&](HWND button,int xx,int yy,int maxW){
+        const int bw=std::min(maxW,buttonWidth(button,S(16)));
         place(button,xx,yy,bw,btn);
         return bw;
     };
@@ -434,7 +434,7 @@ void App::layout() {
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
     // Open/Render Test/Diagnostics live in the top preview toolbar.
     // Keep Analyse in the workflow panel where it belongs.
-    placeButton(analyseBtn_,x,y);y+=S(30);
+    placeButton(analyseBtn_,x,y,w);y+=S(30);
 
     const int groupH=S(300);
     place(refineGroup_,x,y,w,S(20));
@@ -459,21 +459,21 @@ void App::layout() {
     place(resetRefine_,resetX,gy-S(2),std::max(S(100),x+w-pad-resetX),S(26));
     y+=groupH+S(6);
 
-    placeButton(faceModelBtn_,x,y); y+=S(29);
+    placeButton(faceModelBtn_,x,y,w); y+=S(29);
     place(faceModelStatus_,x,y,w,S(34)); y+=S(38);
     place(maskLabel_,x,y,w,S(20)); y+=S(22);
 
     int listH=S(200);
     place(maskList_,x,y,w,listH); y+=listH+S(4);
-    placeButton(guideBtn_,x,y);y+=S(29);
-    const int applyW=placeButton(applyGuideBtn_,x,y);
-    placeButton(resetGuideBtn_,x+applyW+gap,y);y+=S(29);
-    placeButton(createPartBtn_,x,y);y+=S(29);
-    placeButton(approveBtn_,x,y);y+=S(29);
+    placeButton(guideBtn_,x,y,w);y+=S(29);
+    const int applyW=placeButton(applyGuideBtn_,x,y,w);
+    placeButton(resetGuideBtn_,x+applyW+gap,y,std::max(1,w-applyW-gap));y+=S(29);
+    placeButton(createPartBtn_,x,y,w);y+=S(29);
+    placeButton(approveBtn_,x,y,w);y+=S(29);
     place(boundaryCheck_,x,y,w,S(22)); y+=S(24);
     place(cutoutCheck_,x,y,w,S(22)); y+=S(24);
-    placeButton(exportBtn_,x,y);y+=S(29);
-    placeButton(exportAllBtn_,x,y);y+=S(29);
+    placeButton(exportBtn_,x,y,w);y+=S(29);
+    placeButton(exportAllBtn_,x,y,w);y+=S(29);
     // Pose GIF export lives in the top preview toolbar.
     panelContentHeight_=y+pad;
     panelScroll_=std::clamp(panelScroll_,0,std::max(0,panelContentHeight_-ch));
