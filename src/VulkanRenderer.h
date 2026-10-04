@@ -46,6 +46,7 @@ private:
     VkPipelineLayout gearPipelineLayout_ = VK_NULL_HANDLE;
     VkPipeline gearPipeline_ = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> gearFramebuffers_;
+    std::vector<VkImageView> gearColorViews_;
     VkImage gearDepth_ = VK_NULL_HANDLE;
     VkDeviceMemory gearDepthMemory_ = VK_NULL_HANDLE;
     VkImageView gearDepthView_ = VK_NULL_HANDLE;
