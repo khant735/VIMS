@@ -1,0 +1,39 @@
+#include "D3D11CalibrationRenderer.h"
+#include <d3d11.h>
+#include <d3dcompiler.h>
+#include <dxgi.h>
+#include <cmath>
+#include <cstring>
+
+struct V { float x,y,z,r,g,b; };
+struct C { float m[16]; };
+static void rel(IUnknown*&p){if(p){p->Release();p=nullptr;}}
+D3D11CalibrationRenderer::~D3D11CalibrationRenderer(){shutdown();}
+bool D3D11CalibrationRenderer::createTargets(){
+    ID3D11Texture2D* back=nullptr;if(FAILED(swap_->GetBuffer(0,__uuidof(ID3D11Texture2D),(void**)&back)))return false;
+    HRESULT hr=device_->CreateRenderTargetView(back,nullptr,&rtv_);D3D11_TEXTURE2D_DESC d{};back->GetDesc(&d);back->Release();if(FAILED(hr))return false;
+    D3D11_TEXTURE2D_DESC dd{};dd.Width=d.Width;dd.Height=d.Height;dd.MipLevels=1;dd.ArraySize=1;dd.Format=DXGI_FORMAT_D24_UNORM_S8_UINT;dd.SampleDesc.Count=1;dd.BindFlags=D3D11_BIND_DEPTH_STENCIL;
+    ID3D11Texture2D* depth=nullptr;if(FAILED(device_->CreateTexture2D(&dd,nullptr,&depth)))return false;hr=device_->CreateDepthStencilView(depth,nullptr,&dsv_);depth->Release();return SUCCEEDED(hr);
+}
+bool D3D11CalibrationRenderer::initialize(HWND hwnd,std::wstring& error){
+    hwnd_=hwnd;RECT r{};GetClientRect(hwnd,&r);DXGI_SWAP_CHAIN_DESC sd{};sd.BufferCount=2;sd.BufferDesc.Width=std::max(1L,r.right);sd.BufferDesc.Height=std::max(1L,r.bottom);sd.BufferDesc.Format=DXGI_FORMAT_R8G8B8A8_UNORM;sd.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;sd.OutputWindow=hwnd;sd.SampleDesc.Count=1;sd.Windowed=TRUE;sd.SwapEffect=DXGI_SWAP_EFFECT_DISCARD;
+    D3D_FEATURE_LEVEL fl{};if(FAILED(D3D11CreateDeviceAndSwapChain(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,0,nullptr,0,D3D11_SDK_VERSION,&sd,&swap_,&device_,&fl,&context_))){error=L"Direct3D 11 hardware device creation failed.";return false;}
+    IDXGIDevice* xd=nullptr;IDXGIAdapter* a=nullptr;DXGI_ADAPTER_DESC ad{};if(SUCCEEDED(device_->QueryInterface(__uuidof(IDXGIDevice),(void**)&xd))&&SUCCEEDED(xd->GetAdapter(&a))){a->GetDesc(&ad);gpuName_=ad.Description;a->Release();}if(xd)xd->Release();
+    if(!createTargets()){error=L"Direct3D 11 render-target creation failed.";shutdown();return false;}
+    const char* shader="cbuffer C:register(b0){float4x4 m;} struct I{float3 p:POSITION;float3 c:COLOR;};struct O{float4 p:SV_POSITION;float3 c:COLOR;};O vs(I i){O o;o.p=mul(float4(i.p,1),m);o.c=i.c;return o;}float4 ps(O i):SV_TARGET{return float4(i.c,1);}";
+    ID3DBlob *v=nullptr,*p=nullptr,*e=nullptr;if(FAILED(D3DCompile(shader,strlen(shader),nullptr,nullptr,nullptr,"vs","vs_4_0",0,0,&v,&e))||FAILED(D3DCompile(shader,strlen(shader),nullptr,nullptr,nullptr,"ps","ps_4_0",0,0,&p,&e))){if(e)e->Release();error=L"Direct3D shader compilation failed.";shutdown();return false;}
+    device_->CreateVertexShader(v->GetBufferPointer(),v->GetBufferSize(),nullptr,&vs_);device_->CreatePixelShader(p->GetBufferPointer(),p->GetBufferSize(),nullptr,&ps_);
+    D3D11_INPUT_ELEMENT_DESC il[]={{"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},{"COLOR",0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0}};device_->CreateInputLayout(il,2,v->GetBufferPointer(),v->GetBufferSize(),&layout_);v->Release();p->Release();if(e)e->Release();
+    V verts[]={{-.8f,-.6f,.2f,.72f,.12f,.06f},{0,.85f,.2f,.72f,.12f,.06f},{.8f,-.6f,.2f,.72f,.12f,.06f},{-.45f,-.35f,0,.08f,.25f,.85f},{0,.45f,0,.08f,.25f,.85f},{.45f,-.35f,0,.08f,.25f,.85f}};
+    D3D11_BUFFER_DESC bd{};bd.ByteWidth=sizeof(verts);bd.Usage=D3D11_USAGE_IMMUTABLE;bd.BindFlags=D3D11_BIND_VERTEX_BUFFER;D3D11_SUBRESOURCE_DATA init{verts};device_->CreateBuffer(&bd,&init,&vb_);bd.ByteWidth=sizeof(C);bd.Usage=D3D11_USAGE_DYNAMIC;bd.BindFlags=D3D11_BIND_CONSTANT_BUFFER;bd.CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;device_->CreateBuffer(&bd,nullptr,&cb_);return true;
+}
+bool D3D11CalibrationRenderer::draw(float seconds){
+    if(!device_)return false;RECT r{};GetClientRect(hwnd_,&r);if(r.right<=0||r.bottom<=0)return false;float clear[]={.025f,.035f,.055f,1};context_->OMSetRenderTargets(1,&rtv_,dsv_);context_->ClearRenderTargetView(rtv_,clear);context_->ClearDepthStencilView(dsv_,D3D11_CLEAR_DEPTH,1,0);
+    D3D11_VIEWPORT vp{0,0,(float)r.right,(float)r.bottom,0,1};context_->RSSetViewports(1,&vp);UINT stride=sizeof(V),off=0;context_->IASetVertexBuffers(0,1,&vb_,&stride,&off);context_->IASetInputLayout(layout_);context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);context_->VSSetShader(vs_,nullptr,0);context_->PSSetShader(ps_,nullptr,0);
+    float c=cosf(seconds),s=sinf(seconds);C x{{c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1}};D3D11_MAPPED_SUBRESOURCE map{};context_->Map(cb_,0,D3D11_MAP_WRITE_DISCARD,0,&map);memcpy(map.pData,&x,sizeof(x));context_->Unmap(cb_,0);context_->VSSetConstantBuffers(0,1,&cb_);context_->Draw(6,0);return SUCCEEDED(swap_->Present(1,0));
+}
+void D3D11CalibrationRenderer::shutdown(){if(context_)context_->ClearState();IUnknown* p=nullptr;
+#define R(x) p=(IUnknown*)x;rel(p);x=nullptr
+R(cb_);R(vb_);R(layout_);R(ps_);R(vs_);R(dsv_);R(rtv_);R(swap_);R(context_);R(device_);
+#undef R
+}
