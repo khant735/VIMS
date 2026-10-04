@@ -317,6 +317,17 @@ void App::layout() {
         MoveWindow(zoomFitBtn_,S(50),S(10),S(90),S(28),TRUE);
         MoveWindow(zoomInBtn_,S(144),S(10),S(36),S(28),TRUE);
     }
+    // Use the otherwise empty preview toolbar for the primary/open and
+    // maintenance actions. These controls are reparented here so they remain
+    // visible above the Vulkan surface instead of consuming the right panel.
+    const int topButtonH=S(30), topGap=S(8);
+    int topX=S(196);
+    const int openW=S(120), renderW=S(190), diagW=S(150);
+    SetParent(openBtn_,hwnd_);SetParent(gpuSelfTestBtn_,hwnd_);SetParent(diagnosticsBtn_,hwnd_);
+    MoveWindow(openBtn_,topX,S(9),openW,topButtonH,TRUE); topX+=openW+topGap;
+    MoveWindow(gpuSelfTestBtn_,topX,S(9),renderW,topButtonH,TRUE); topX+=renderW+topGap;
+    MoveWindow(diagnosticsBtn_,topX,S(9),diagW,topButtonH,TRUE);
+
     RECT existingPanel{};GetWindowRect(rightPanel_,&existingPanel);
     if(existingPanel.right-existingPanel.left!=cw-vw||existingPanel.bottom-existingPanel.top!=ch)
         MoveWindow(rightPanel_,vw,0,std::max(1,cw-vw),ch,TRUE);
@@ -362,10 +373,9 @@ void App::layout() {
     place(gpuUsageText_,x,y,w,S(66)); y+=S(75);
     place(cpuCombo_,x,y,w,S(200)); y+=S(30);
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
-    place(openBtn_,x,y,(w-gap)/2,btn);
-    place(analyseBtn_,x+(w+gap)/2,y,(w-gap)/2,btn);y+=S(36);
-    place(gpuSelfTestBtn_,x,y,w,btn);y+=S(36);
-    place(diagnosticsBtn_,x,y,w,btn);y+=S(36);
+    // Open/Render Test/Diagnostics live in the top preview toolbar.
+    // Keep Analyse in the workflow panel where it belongs.
+    place(analyseBtn_,x,y,w,btn);y+=S(36);
 
     const int groupH=S(300);
     place(refineGroup_,x,y,w,S(20));
