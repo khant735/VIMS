@@ -111,7 +111,7 @@ jobs:
         shell: pwsh
         run: |
           $out = 'build\Release'
-          Copy-Item download_models.ps1 $out -Force
+          Copy-Item download_models.ps1,Download_VIMS_Shaders.ps1 $out -Force
           Copy-Item models $out -Recurse -Force
           Copy-Item LICENSE,THIRD_PARTY.md $out -Force
           $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'development' }
