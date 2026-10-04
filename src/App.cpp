@@ -194,8 +194,12 @@ void App::createUi() {
     zoomOutBtn_=CreateWindowW(L"BUTTON",L"-",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,34,28,hwnd_,(HMENU)IDC_ZOOM_OUT,instance_,nullptr);
     zoomFitBtn_=CreateWindowW(L"BUTTON",L"Fit image",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,90,28,hwnd_,(HMENU)IDC_ZOOM_FIT,instance_,nullptr);
     zoomInBtn_=CreateWindowW(L"BUTTON",L"+",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,0,0,34,28,hwnd_,(HMENU)IDC_ZOOM_IN,instance_,nullptr);
-    cpuText_ = CreateWindowW(L"STATIC", (L"CPU: " + cpu_.name() + L" | " + cpu_.description()).c_str(), WS_CHILD | WS_VISIBLE,
-        0,0,100,20, panelContent_, nullptr, instance_, nullptr);
+    std::wstring cpuSummary=L"CPU: "+cpu_.name()+L"\r\n"+cpu_.description();
+    // Put SMT/Hyper-Threading status on its own line when present.
+    const auto smtPos=cpuSummary.find(L" (SMT");
+    if(smtPos!=std::wstring::npos) cpuSummary.replace(smtPos,1,L"\r\n");
+    cpuText_ = CreateWindowW(L"STATIC",cpuSummary.c_str(),WS_CHILD|WS_VISIBLE|SS_LEFT,
+        0,0,100,20,panelContent_,nullptr,instance_,nullptr);
     cpuUsageText_ = CreateWindowW(L"STATIC", L"CPU utilisation (all logical processors): sampling...", WS_CHILD | WS_VISIBLE,
         0,0,100,20, panelContent_, nullptr, instance_, nullptr);
     gpuText_ = CreateWindowW(L"STATIC", L"GPU: initialising Vulkan...", WS_CHILD | WS_VISIBLE,
@@ -340,7 +344,16 @@ void App::layout() {
     place(operationProgress_,x,y,w,S(20)); y+=S(24);
     place(GetDlgItem(panelContent_,IDC_OPERATION_DETAIL),x,y,w,S(58)); y+=S(62);
     place(GetDlgItem(panelContent_,IDC_OPERATION_LOG),x,y,w,S(86)); y+=S(90);
-    place(cpuText_,x,y,w,S(22)); y+=S(27);
+    // CPU inventory: three lines per detected CPU block (model, cores/threads,
+    // SMT status). Grow the control from its actual wrapped text height.
+    HDC cpuDc=GetDC(cpuText_);RECT cpuMeasure{0,0,w,0};
+    HFONT cpuFont=(HFONT)SendMessageW(cpuText_,WM_GETFONT,0,0),cpuOld=nullptr;
+    if(cpuFont)cpuOld=(HFONT)SelectObject(cpuDc,cpuFont);
+    wchar_t cpuBuf[2048]{};GetWindowTextW(cpuText_,cpuBuf,2048);
+    DrawTextW(cpuDc,cpuBuf,-1,&cpuMeasure,DT_CALCRECT|DT_WORDBREAK|DT_LEFT);
+    if(cpuOld)SelectObject(cpuDc,cpuOld);ReleaseDC(cpuText_,cpuDc);
+    const int cpuH=std::max(S(22),cpuMeasure.bottom-cpuMeasure.top+S(4));
+    place(cpuText_,x,y,w,cpuH); y+=cpuH+S(5);
     place(cpuUsageText_,x,y,w,S(22)); y+=S(31);
     place(gpuText_,x,y,w,S(66)); y+=S(72);
     place(gpuUsageText_,x,y,w,S(66)); y+=S(75);
