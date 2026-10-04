@@ -25,6 +25,7 @@
 #include <array>
 #include <chrono>
 #include <windowsx.h>
+#include <winternl.h>
 #include <cmath>
 #include <pdh.h>
 #include <dxgi1_2.h>
