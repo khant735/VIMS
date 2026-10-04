@@ -1507,22 +1507,24 @@ void App::downloadFaceModel() {
     if (downloadingFaceModel_) return;
     const auto modelScript = exeDir() / L"download_models.ps1";
     const auto shaderScript = exeDir() / L"Download_VIMS_Shaders.ps1";
-    if (!std::filesystem::exists(modelScript) || !std::filesystem::exists(shaderScript)) {
+    const auto textureScript = exeDir() / L"textures.ps1";
+    if (!std::filesystem::exists(modelScript) || !std::filesystem::exists(shaderScript) || !std::filesystem::exists(textureScript)) {
         std::wstring missing;
         if (!std::filesystem::exists(modelScript)) missing += L"download_models.ps1\\n";
         if (!std::filesystem::exists(shaderScript)) missing += L"Download_VIMS_Shaders.ps1\\n";
+        if (!std::filesystem::exists(textureScript)) missing += L"textures.ps1\\n";
         showError(L"Resource downloader", L"The following downloader script(s) are missing beside the application:\\n\\n" + missing);
         return;
     }
     downloadingFaceModel_ = true;
-    beginOperation(L"Downloading / verifying AI models and Vulkan shaders...",-1);
+    beginOperation(L"Downloading / verifying AI models, Vulkan shaders and textures...",-1);
     EnableWindow(faceModelBtn_, FALSE);
-    setStatus(L"Running model downloader first, then Vulkan shader downloader...");
-    modelWorker_ = std::jthread([this,modelScript,shaderScript](std::stop_token st) {
+    setStatus(L"Running model, Vulkan shader, then texture downloaders...");
+    modelWorker_ = std::jthread([this,modelScript,shaderScript,textureScript](std::stop_token st) {
         const auto logsDir = exeDir() / L"Logs";
         std::error_code ec; std::filesystem::create_directories(logsDir,ec);
         { std::wofstream lf(logsDir / L"resource_downloader_launch.log", std::ios::trunc);
-          lf << L"Model script: " << modelScript.wstring() << L"\\nShader script: " << shaderScript.wstring() << L"\\n"; }
+          lf << L"Model script: " << modelScript.wstring() << L"\\nShader script: " << shaderScript.wstring() << L"\\nTexture script: " << textureScript.wstring() << L"\\n"; }
 
         auto runScript = [this,&st](const std::filesystem::path& script,const std::filesystem::path& log) -> bool {
             if(st.stop_requested()) return false;
@@ -1543,7 +1545,9 @@ void App::downloadFaceModel() {
         const bool modelsOk=runScript(modelScript,logsDir/L"model_downloader_console.log");
         const bool shadersOk=modelsOk&&!st.stop_requested() &&
             runScript(shaderScript,logsDir/L"shader_downloader_console.log");
-        if(!st.stop_requested()) PostMessageW(hwnd_,WM_FACE_MODEL_DONE,(modelsOk&&shadersOk)?1:0,0);
+        const bool texturesOk=shadersOk&&!st.stop_requested() &&
+            runScript(textureScript,logsDir/L"texture_downloader_console.log");
+        if(!st.stop_requested()) PostMessageW(hwnd_,WM_FACE_MODEL_DONE,(modelsOk&&shadersOk&&texturesOk)?1:0,0);
     });
 }
 
@@ -1551,10 +1555,10 @@ void App::faceModelDone(bool ok) {
     endOperation();
     downloadingFaceModel_=false; EnableWindow(faceModelBtn_,TRUE); updateFaceModelStatus();
     if(ok){
-        setStatus(L"AI models and Vulkan shaders downloaded/verified successfully.");
-        MessageBoxW(hwnd_,L"The AI model and Vulkan shader download/verification passes both completed successfully.",L"Resources installed",MB_OK|MB_ICONINFORMATION);
+        setStatus(L"AI models, Vulkan shaders and textures downloaded/verified successfully.");
+        MessageBoxW(hwnd_,L"The AI model, Vulkan shader and texture download/verification passes all completed successfully.",L"Resources installed",MB_OK|MB_ICONINFORMATION);
     } else {
         setStatus(L"Resource download/verification failed.");
-        showError(L"Resource downloader",L"The model or shader downloader did not complete successfully. See Logs\\resource_downloader_launch.log, Logs\\model_downloader_console.log, Logs\\shader_downloader_console.log, model_download_report.txt and shader_download_report.txt.");
+        showError(L"Resource downloader",L"The model, shader or texture downloader did not complete successfully. See Logs\\resource_downloader_launch.log, Logs\\model_downloader_console.log, Logs\\shader_downloader_console.log, Logs\\texture_downloader_console.log, model_download_report.txt and shader_download_report.txt.");
     }
 }
