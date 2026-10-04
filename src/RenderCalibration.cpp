@@ -82,6 +82,24 @@ const std::vector<CalibrationBackendInfo>& calibrationBackends(){
     return b;
 }
 
+CalibrationTextureProfile calibrationTextureProfile(CalibrationBackend b){
+    switch(b){
+    case CalibrationBackend::Ps2Gs: return {L"GS compact/swizzled RGBA",128,96,false};
+    case CalibrationBackend::DreamcastPvr: return {L"PVR/VQ",256,128,true};
+    case CalibrationBackend::GameCubeGx: case CalibrationBackend::WiiGx: return {L"GX CMPR",256,192,true};
+    case CalibrationBackend::PspGu: return {L"PSP swizzled/DXT",256,192,true};
+    case CalibrationBackend::Ps3Rsx: case CalibrationBackend::Direct3D9: case CalibrationBackend::Xbox360D3D9: return {L"DXT1/DXT5",512,512,true};
+    case CalibrationBackend::PsVitaGxm: case CalibrationBackend::PsTvGxm: return {L"GXM compressed",512,512,true};
+    case CalibrationBackend::OpenGLES: case CalibrationBackend::WebGL1: case CalibrationBackend::WebGL2: case CalibrationBackend::NvidiaShieldOpenGLES: return {L"ETC2/S3TC capability-selected",512,512,true};
+    case CalibrationBackend::AppleMetal: return {L"ASTC",1024,1024,true};
+    case CalibrationBackend::WebGPU: return {L"BC/ETC2/ASTC capability-selected",1024,1024,true};
+    case CalibrationBackend::WiiUGx2: case CalibrationBackend::SwitchNvn: case CalibrationBackend::SwitchVulkan: case CalibrationBackend::NvidiaShieldVulkan: return {L"BC/ASTC capability-selected",1024,1024,true};
+    case CalibrationBackend::Vulkan: case CalibrationBackend::Direct3D11: case CalibrationBackend::Direct3D12: case CalibrationBackend::XboxOneD3D11: case CalibrationBackend::XboxSeriesD3D12: case CalibrationBackend::Ps4Gnm: case CalibrationBackend::Ps5Gnm: return {L"BC7/BC3 capability-selected",1024,1024,true};
+    case CalibrationBackend::OpenGL: return {L"BC/S3TC capability-selected",1024,1024,true};
+    default: return {L"RGBA8",256,768,false};
+    }
+}
+
 const wchar_t* calibrationResultName(CalibrationResultKind k){
     switch(k){
     case CalibrationResultKind::RenderPass:return L"RENDER PASS";
