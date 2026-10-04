@@ -340,10 +340,10 @@ void App::layout() {
     place(operationProgress_,x,y,w,S(20)); y+=S(24);
     place(GetDlgItem(panelContent_,IDC_OPERATION_DETAIL),x,y,w,S(58)); y+=S(62);
     place(GetDlgItem(panelContent_,IDC_OPERATION_LOG),x,y,w,S(86)); y+=S(90);
-    place(cpuText_,x,y,w,S(22)); y+=S(23);
-    place(cpuUsageText_,x,y,w,S(22)); y+=S(23);
-    place(gpuText_,x,y,w,S(66)); y+=S(67);
-    place(gpuUsageText_,x,y,w,S(66)); y+=S(71);
+    place(cpuText_,x,y,w,S(22)); y+=S(27);
+    place(cpuUsageText_,x,y,w,S(22)); y+=S(31);
+    place(gpuText_,x,y,w,S(66)); y+=S(72);
+    place(gpuUsageText_,x,y,w,S(66)); y+=S(75);
     place(cpuCombo_,x,y,w,S(200)); y+=S(30);
     place(backendCombo_,x,y,w,S(160)); y+=S(32);
     place(openBtn_,x,y,(w-gap)/2,btn);
