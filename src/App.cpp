@@ -621,7 +621,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     // Make the calibration scene visibly own the preview while it runs.
                     // WM_PAINT/WM_ERASEBKGND from the child view can otherwise repaint over
                     // freshly presented Vulkan frames while this synchronous test pumps messages.
-                    SetWindowTextW(status_,L"3D Vulkan self-test: rendering two gears in the preview...");
+                    setStatus(L"3D Vulkan self-test: rendering two gears in the preview...");
                     RedrawWindow(view_,nullptr,nullptr,RDW_INVALIDATE|RDW_UPDATENOW);
                     const ULONGLONG start=GetTickCount64();unsigned frames=0;
                     while(GetTickCount64()-start<6000){
