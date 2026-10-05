@@ -72,7 +72,7 @@ See [BUILDING.md](https://github.com/khant735/VIMS/blob/main/BUILDING.md). For p
 Version 0.4.12.12 is a preview. It compiled and its ZIP passed an integrity check, but recent Windows UI fixes, Snipping Tool compatibility, and detection accuracy require testing on an actual Windows installation. Please report the app version, reproduction steps, a screenshot or recording, and the relevant `Logs` files when filing an issue.
 
 ## Target Render / Future changes & improvements.
-https://github.com/khant735/VIMS/blob/main/e2a2e23f-e9e2-4e2f-b762-15cad8b8657a.png
+<img width="1536" height="1024" alt="e2a2e23f-e9e2-4e2f-b762-15cad8b8657a" src="https://github.com/user-attachments/assets/eab25333-a0bb-4b50-99ab-85e953b80908" />
 
 ## License and external components
 
