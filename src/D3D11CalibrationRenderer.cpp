@@ -12,12 +12,21 @@ struct V { float x,y,z,r,g,b; };
 struct C { float m[16]; };
 static void rel(IUnknown*&p){if(p){p->Release();p=nullptr;}}
 static void addTextBars(std::vector<V>& out,const std::wstring& text,float x,float y,float scale){
-    static const unsigned short glyphs[37]={
-        0x7B6F,0x2492,0x73E7,0x73CF,0x5BC9,0x79CF,0x79EF,0x7249,0x7BEF,0x7BCF,
-        0x7BED,0x6BAE,0x7927,0x6B6E,0x79E7,0x79E4,0x792F,0x5BED,0x7249,0x124E,0x5AAD,0x4927,0x5F6D,0x5B6D,0x7B6F,0x7BE4,0x7B6B,0x7BEA,0x79CF,0x7248,0x5B6F,0x5B6A,0x5F7D,0x5AAD,0x5AA4,0x72E7,0};
-    auto bit=[&](wchar_t ch,int r,int col)->bool{int idx=-1;if(ch>=L'0'&&ch<=L'9')idx=ch-L'0';else if(ch>=L'A'&&ch<=L'Z')idx=10+ch-L'A';if(idx<0)return false;return ((glyphs[idx]>>(14-(r*3+col)))&1)!=0;};
-    float px=x;for(wchar_t raw:text){wchar_t ch=(wchar_t)towupper(raw);if(ch==L' '){px+=scale*2.5f;continue;}if(ch==L':'||ch==L'-'||ch==L'/'){px+=scale*2;continue;}
-        for(int r=0;r<5;r++)for(int col=0;col<3;col++)if(bit(ch,r,col)){float x0=px+col*scale,y0=y-r*scale,x1=x0+scale*.82f,y1=y0-scale*.82f;float z=.5f;V a{x0,y0,z,1,1,1},b{x1,y0,z,1,1,1},cc{x1,y1,z,1,1,1},d{x0,y1,z,1,1,1};out.insert(out.end(),{a,b,cc,a,cc,d});}px+=scale*3.8f;}
+    // Explicit 3x5 rows avoid the old packed-glyph bit-order corruption.
+    static const char* g[]={
+      "111101101101111","010110010010111","111001111100111","111001111001111","101101111001001",
+      "111100111001111","111100111101111","111001001001001","111101111101111","111101111001111",
+      "010101111101101","110101110101110","111100100100111","110101101101110","111100110100111",
+      "111100110100100","111100101101111","101101111101101","111010010010111","001001001101111",
+      "101101110101101","100100100100111","101111111101101","101111111111101","111101101101111",
+      "111101111100100","111101101111001","111101111110101","111100111001111","111010010010010",
+      "101101101101111","101101101101010","101101111111101","101101010101101","101101010010010",
+      "111001010100111"};
+    auto on=[&](wchar_t ch,int r,int col){int i=-1;if(ch>=L'0'&&ch<=L'9')i=ch-L'0';else if(ch>=L'A'&&ch<=L'Z')i=10+ch-L'A';return i>=0&&g[i][r*3+col]=='1';};
+    auto cell=[&](float x0,float y0){float x1=x0+scale*.82f,y1=y0-scale*.82f,z=.5f;V a{x0,y0,z,1,1,1},b{x1,y0,z,1,1,1},cc{x1,y1,z,1,1,1},d{x0,y1,z,1,1,1};out.insert(out.end(),{a,b,cc,a,cc,d});};
+    float px=x;for(wchar_t raw:text){wchar_t ch=(wchar_t)towupper(raw);if(ch==L' '){px+=scale*2.5f;continue;}
+      if(ch==L'-'){cell(px,y-2*scale);px+=scale*2;continue;}if(ch==L':'){cell(px,y-scale);cell(px,y-3*scale);px+=scale*2;continue;}
+      for(int r=0;r<5;r++)for(int col=0;col<3;col++)if(on(ch,r,col))cell(px+col*scale,y-r*scale);px+=scale*3.8f;}
 }
 D3D11CalibrationRenderer::~D3D11CalibrationRenderer(){shutdown();}
 bool D3D11CalibrationRenderer::createTargets(){
