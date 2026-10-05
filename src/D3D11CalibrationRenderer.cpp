@@ -27,8 +27,9 @@ bool D3D11CalibrationRenderer::createTargets(){
     ID3D11Texture2D* depth=nullptr;if(FAILED(device_->CreateTexture2D(&dd,nullptr,&depth)))return false;hr=device_->CreateDepthStencilView(depth,nullptr,&dsv_);depth->Release();return SUCCEEDED(hr);
 }
 bool D3D11CalibrationRenderer::initialize(HWND hwnd,std::wstring& error){
-    hwnd_=hwnd;RECT r{};GetClientRect(hwnd,&r);DXGI_SWAP_CHAIN_DESC sd{};sd.BufferCount=2;sd.BufferDesc.Width=std::max(1L,r.right);sd.BufferDesc.Height=std::max(1L,r.bottom);sd.BufferDesc.Format=DXGI_FORMAT_R8G8B8A8_UNORM;sd.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;sd.OutputWindow=hwnd;sd.SampleDesc.Count=1;sd.Windowed=TRUE;sd.SwapEffect=DXGI_SWAP_EFFECT_DISCARD;sd.Flags=DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE;
-    D3D_FEATURE_LEVEL fl{};if(FAILED(D3D11CreateDeviceAndSwapChain(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,0,nullptr,0,D3D11_SDK_VERSION,&sd,&swap_,&device_,&fl,&context_))){error=L"Direct3D 11 hardware device creation failed.";return false;}
+    hwnd_=hwnd;RECT r{};GetClientRect(hwnd,&r);DXGI_SWAP_CHAIN_DESC sd{};sd.BufferCount=2;sd.BufferDesc.Width=std::max(1L,r.right);sd.BufferDesc.Height=std::max(1L,r.bottom);sd.BufferDesc.Format=DXGI_FORMAT_R8G8B8A8_UNORM;sd.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;sd.OutputWindow=hwnd;sd.SampleDesc.Count=1;sd.Windowed=TRUE;sd.SwapEffect=DXGI_SWAP_EFFECT_DISCARD;sd.Flags=0;
+    D3D_FEATURE_LEVEL fl{};HRESULT createHr=D3D11CreateDeviceAndSwapChain(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,0,nullptr,0,D3D11_SDK_VERSION,&sd,&swap_,&device_,&fl,&context_);
+    if(FAILED(createHr)){wchar_t buf[160]{};swprintf(buf,160,L"Direct3D 11 hardware device creation failed (HRESULT 0x%08X).",(unsigned)createHr);error=buf;return false;}
     IDXGIDevice* xd=nullptr;IDXGIAdapter* a=nullptr;DXGI_ADAPTER_DESC ad{};if(SUCCEEDED(device_->QueryInterface(__uuidof(IDXGIDevice),(void**)&xd))&&SUCCEEDED(xd->GetAdapter(&a))){a->GetDesc(&ad);gpuName_=ad.Description;a->Release();}if(xd)xd->Release();
     if(!createTargets()){error=L"Direct3D 11 render-target creation failed.";shutdown();return false;}
     const char* shader="cbuffer C:register(b0){float4x4 m;} struct I{float3 p:POSITION;float3 c:COLOR;};struct O{float4 p:SV_POSITION;float3 c:COLOR;};O vs(I i){O o;o.p=mul(float4(i.p,1),m);o.c=i.c;return o;}float4 ps(O i):SV_TARGET{return float4(i.c,1);}";
