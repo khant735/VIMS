@@ -51,6 +51,8 @@ private:
     VkRenderPass gearRenderPass_ = VK_NULL_HANDLE;
     VkPipelineLayout gearPipelineLayout_ = VK_NULL_HANDLE;
     VkPipeline gearPipeline_ = VK_NULL_HANDLE;
+    VkPipeline hudPipeline_ = VK_NULL_HANDLE;
+    VkPipelineLayout hudPipelineLayout_ = VK_NULL_HANDLE;
     VkDescriptorSetLayout gearDescriptorSetLayout_ = VK_NULL_HANDLE;
     VkDescriptorPool gearDescriptorPool_ = VK_NULL_HANDLE;
     VkDescriptorSet gearDescriptorSets_[3] = {VK_NULL_HANDLE,VK_NULL_HANDLE,VK_NULL_HANDLE};
