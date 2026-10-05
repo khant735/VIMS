@@ -20,6 +20,7 @@
 #include <iterator>
 #include <commctrl.h>
 #include <winhttp.h>
+#include <dwmapi.h>
 #include <bcrypt.h>
 #include <iomanip>
 #include <unordered_map>
@@ -706,6 +707,12 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     // remained the visible owner.
                     renderer_.shutdown();
                     vulkanReady_=false;
+                    // Vulkan's last presented image can remain composed on the child HWND
+                    // after its swapchain is destroyed. Explicitly clear/invalidate the
+                    // presentation surface before DXGI creates the D3D11 swapchain.
+                    InvalidateRect(view_,nullptr,TRUE);
+                    UpdateWindow(view_);
+                    DwmFlush();
                     report<<L"  Vulkan device: PASS [active renderer]\r\n";
                     report<<L"  Internal framebuffer: "<<targetW<<L" x "<<targetH<<L"\r\n";
                     if(renderFps>0.0){
