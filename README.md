@@ -71,6 +71,9 @@ See [BUILDING.md](https://github.com/khant735/VIMS/blob/main/BUILDING.md). For p
 
 Version 0.4.12.12 is a preview. It compiled and its ZIP passed an integrity check, but recent Windows UI fixes, Snipping Tool compatibility, and detection accuracy require testing on an actual Windows installation. Please report the app version, reproduction steps, a screenshot or recording, and the relevant `Logs` files when filing an issue.
 
+## Target Render / Future changes & improvements.
+https://github.com/khant735/VIMS/blob/main/e2a2e23f-e9e2-4e2f-b762-15cad8b8657a.png
+
 ## License and external components
 
 The application source carries the [MIT license](LICENSE). Bundled runtime DLLs and optional downloaded models have separate licenses; see [THIRD_PARTY.md](THIRD_PARTY.md). Check upstream model terms before redistributing model weights.
