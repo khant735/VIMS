@@ -20,7 +20,7 @@ $exe = Join-Path $output 'VulkanImageMaskStudio.exe'
 # Embed render-test SPIR-V so the EXE-only artifact needs no shader sidecars.
 $shaderHeader = Join-Path $PSScriptRoot 'src/CogShaders.generated.h'
 $shaderText = "#pragma once`r`n#include <cstdint>`r`n#include <cstddef>`r`n"
-foreach ($spec in @(@('cog.vert.spv','kCogVertSpv'),@('cog.frag.spv','kCogFragSpv'))) {
+foreach ($spec in @(@('cog.vert.spv','kCogVertSpv'),@('cog.frag.spv','kCogFragSpv'),@('hud.vert.spv','kHudVertSpv'),@('hud.frag.spv','kHudFragSpv'))) {
     $shaderPath = Require-File (Join-Path $PSScriptRoot "src/$($spec[0])") "3D calibration shader $($spec[0])"
     [byte[]]$bytes = [IO.File]::ReadAllBytes($shaderPath)
     if (($bytes.Length % 4) -ne 0) { throw "Invalid SPIR-V byte length: $shaderPath" }
@@ -36,7 +36,7 @@ if ($LASTEXITCODE -ne 0) { throw "Compiler returned exit code $LASTEXITCODE" }
 # The Vulkan 3D calibration pipeline loads its SPIR-V modules beside the EXE.
 # Copy them here (after the build output directory exists) so local builds and
 # GitHub Actions packages have identical runtime layout.
-foreach ($shader in @('cog.vert.spv','cog.frag.spv')) {
+foreach ($shader in @('cog.vert.spv','cog.frag.spv','hud.vert.spv','hud.frag.spv')) {
     $shaderPath = Join-Path $PSScriptRoot "src/$shader"
     if (Test-Path -LiteralPath $shaderPath -PathType Leaf) { Copy-Item -LiteralPath $shaderPath -Destination $output -Force }
     else { Write-Warning "Render-test shader not copied: $shaderPath" }
