@@ -184,7 +184,7 @@ int App::run(int showCmd) {
     RegisterClassW(&vc);
 
     WNDCLASSW pc=wc;pc.lpfnWndProc=panelProc;pc.lpszClassName=L"VulkanImageMaskStudioPanel";RegisterClassW(&pc);
-    hwnd_ = CreateWindowExW(0, wc.lpszClassName, L"Vulkan Image Mask Studio 0.4.12.13 (ZIP/RGBA build)",
+    hwnd_ = CreateWindowExW(0, wc.lpszClassName, L"Vulkan Image Mask Studio v0.4.12.13",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT, 1400, 860,
         nullptr, nullptr, instance_, this);
     if (!hwnd_) return 1;
@@ -676,7 +676,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     // WM_PAINT/WM_ERASEBKGND from the child view can otherwise repaint over
                     // freshly presented Vulkan frames while this synchronous test pumps messages.
                     {
-                        std::wstring sceneTitle=L"VIMS Render Scene - Vulkan - "+g.name;
+                        std::wstring sceneTitle=L"Vulkan Image Mask Studio v0.4.12.13";
                         SetWindowTextW(hwnd_,sceneTitle.c_str());
                         renderer_.setCalibrationIdentity("VULKAN",wideToUtf8(g.name));
                     }
@@ -729,7 +729,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     setStatus(L"3D Direct3D 11 self-test: starting native renderer...");
                     if(d3d.initialize(view_,d3dError)){
                         {
-                            std::wstring sceneTitle=L"VIMS Render Scene - Direct3D 11 - "+d3d.gpuName();
+                            std::wstring sceneTitle=L"Vulkan Image Mask Studio v0.4.12.13";
                             SetWindowTextW(hwnd_,sceneTitle.c_str());
                             d3d.setIdentity(L"D3D11",d3d.gpuName());
                             setStatus((L"3D Direct3D 11 self-test: Direct3D 11 | "+d3d.gpuName()+L" | rendering two gears...").c_str());
@@ -757,7 +757,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                         renderer_.initialize(view_);
                         vulkanReady_=true;
                         if(!image_.empty())renderer_.setImage(image_);
-                        SetWindowTextW(hwnd_,L"Vulkan Image Mask Studio");
+                        SetWindowTextW(hwnd_,L"Vulkan Image Mask Studio v0.4.12.13");
                     }catch(const std::exception& e){
                         report<<L"  Vulkan restore after D3D11: FAILED - "<<widen(e.what())<<L"\r\n";
                     }
