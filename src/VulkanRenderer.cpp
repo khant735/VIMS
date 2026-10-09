@@ -589,12 +589,38 @@ bool VulkanRenderer::drawGearCalibration(float seconds,uint32_t targetWidth,uint
     // Generate a compact 3x5 raster font as native Vulkan triangles.
     if(hudPipeline_&&!calibrationBackend_.empty()){
         static const char* glyph[]={"111101101101111","010110010010111","111001111100111","111001111001111","101101111001001","111100111001111","111100111101111","111001001001001","111101111101111","111101111001111","010101111101101","110101110101110","111100100100111","110101101101110","111100110100111","111100110100100","111100101101111","101101111101101","111010010010111","001001001101111","101101110101101","100100100100111","101111111101101","101111111111101","111101101101111","111101111100100","111101101111001","111101111110101","111100111001111","111010010010010","101101101101111","101101101101010","101101111111101","101101010101101","101101010010010","111001010100111"};
-        std::string label=calibrationBackend_+"  "+calibrationGpu_;
-        std::transform(label.begin(),label.end(),label.begin(),[](unsigned char ch){return (char)std::toupper(ch);});
-        std::vector<float> triangles;float unit=std::min(.010f,1.82f/std::max<size_t>(1,label.size()*4));float x=-.94f,y=.91f;
-        auto square=[&](float xx,float yy){float w=unit*.85f,h=unit*.85f;float q[]={xx,yy,xx+w,yy,xx+w,yy-h,xx,yy,xx+w,yy-h,xx,yy-h};triangles.insert(triangles.end(),q,q+12);};
-        for(char ch:label){if(ch==' '){x+=unit*2.5f;continue;}int idx=-1;if(ch>='0'&&ch<='9')idx=ch-'0';else if(ch>='A'&&ch<='Z')idx=ch-'A'+10;
-            if(idx>=0)for(int r=0;r<5;++r)for(int col=0;col<3;++col)if(glyph[idx][r*3+col]=='1')square(x+col*unit,y-r*unit);x+=unit*3.8f;}
+        // Vulkan's positive-height viewport maps clip-space Y=-1 to the TOP.
+        // Use integer-sized pixels in the render target and separate lines so
+        // long adapter names do not shrink the font into illegibility.
+        std::string backend=calibrationBackend_,gpu=calibrationGpu_;
+        std::transform(backend.begin(),backend.end(),backend.begin(),[](unsigned char c){return (char)std::toupper(c);});
+        std::transform(gpu.begin(),gpu.end(),gpu.begin(),[](unsigned char c){return (char)std::toupper(c);});
+        std::vector<float> triangles;
+        const float px=2.0f/(float)gearTargetExtent_.width;
+        const float py=2.0f/(float)gearTargetExtent_.height;
+        const float pixelScale=(float)std::max(1u,gearTargetExtent_.height/360u);
+        const float cellX=px*pixelScale,cellY=py*pixelScale;
+        auto square=[&](float xx,float yy){
+            const float q[]={xx,yy,xx+cellX,yy,xx+cellX,yy+cellY,
+                             xx,yy,xx+cellX,yy+cellY,xx,yy+cellY};
+            triangles.insert(triangles.end(),q,q+12);
+        };
+        auto line=[&](const std::string& label,int row){
+            float x=-1.0f+12.0f*px;
+            float y=-1.0f+(12.0f+row*8.0f*pixelScale)*py;
+            for(char ch:label){
+                if(ch==' '){x+=cellX*3.0f;continue;}
+                int idx=-1;
+                if(ch>='0'&&ch<='9')idx=ch-'0';
+                else if(ch>='A'&&ch<='Z')idx=ch-'A'+10;
+                if(idx>=0)for(int r=0;r<5;++r)for(int col=0;col<3;++col)
+                    if(glyph[idx][r*3+col]=='1')square(x+col*cellX,y+r*cellY);
+                x+=cellX*4.0f;
+                if(x>1.0f-12.0f*px)break;
+            }
+        };
+        line(backend,0);
+        line(gpu,1);
         if(!triangles.empty()){
             VkBuffer vb{};VkDeviceMemory vm{};VkBufferCreateInfo bi{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};bi.size=triangles.size()*sizeof(float);bi.usage=VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;bi.sharingMode=VK_SHARING_MODE_EXCLUSIVE;
             vkCheck(vkCreateBuffer(device_,&bi,nullptr,&vb),"HUD buffer creation failed.");VkMemoryRequirements mr{};vkGetBufferMemoryRequirements(device_,vb,&mr);
