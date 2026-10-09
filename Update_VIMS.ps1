@@ -36,6 +36,16 @@ try {
   if($useDelta){foreach($key in $local.Keys){if(!$prev.ContainsKey($key) -or $prev[$key] -ne $local[$key]){$useDelta=$false;break}}}
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.IO.Compression.FileSystem
+  # A delta is safe only when every installed previous-version file matches.
+  if($useDelta){
+    foreach($name in $prev.Keys){
+      $installed=Join-Path $base $name
+      if(!(Test-Path -LiteralPath $installed -PathType Leaf) -or
+         (Get-FileHash -LiteralPath $installed -Algorithm SHA256).Hash.ToLowerInvariant() -ne $prev[$name]){
+        $useDelta=$false;break
+      }
+    }
+  }
   $changed=@($latest.Keys | Where-Object { !(Test-Path (Join-Path $base $_)) -or (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $base $_)).Hash.ToLowerInvariant() -ne $latest[$_] })
   if($changed.Count -eq 0){[void][System.Windows.Forms.MessageBox]::Show('VIMS files are up to date.','Updates!');return}
   $mode=if($useDelta){'VIMS-Update-Files.zip'}else{'VIMS-Full-Windows-x64.zip'}
@@ -63,8 +73,8 @@ try {
         New-Item -ItemType Directory -Force -Path (Split-Path $old -Parent) | Out-Null
         Copy-Item -LiteralPath $target -Destination $old -Force
       }
-      Copy-Item -LiteralPath (Join-Path $stage $name) -Destination $target -Force
       $installed.Add($name)
+      Copy-Item -LiteralPath (Join-Path $stage $name) -Destination $target -Force
     }
     Copy-Item $latestFile $localFile -Force
   }catch{
