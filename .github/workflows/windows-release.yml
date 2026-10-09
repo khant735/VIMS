@@ -136,7 +136,7 @@ jobs:
           }
           $current = @{}
           Get-ChildItem $out -Recurse -File | Where-Object { $_.Name -ne 'DISTRIBUTION_CHANGE_LIST.txt' } | ForEach-Object {
-            $relative = $_.FullName.Substring((Resolve-Path $out).Path.Length + 1).Replace('\\','/')
+            $relative = $_.FullName.Substring((Resolve-Path $out).Path.Length + 1).Replace([char]92,'/')
             $current[$relative] = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           }
           $lines = @('VIMS DISTRIBUTION FILE CHANGE LIST', "Build commit: $env:GITHUB_SHA",
