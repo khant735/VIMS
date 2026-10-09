@@ -727,15 +727,11 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                     D3D11CalibrationRenderer d3d;
                     std::wstring d3dError;
                     setStatus(L"3D Direct3D 11 self-test: starting native renderer...");
-                    // Separate DXGI window prevents stale Vulkan composition on view_.
-                    RECT d3dRect{};GetWindowRect(view_,&d3dRect);
-                    MapWindowPoints(nullptr,hwnd_,reinterpret_cast<POINT*>(&d3dRect),2);
-                    HWND d3dView=CreateWindowExW(0,L"STATIC",nullptr,
-                        WS_CHILD|WS_VISIBLE|WS_CLIPSIBLINGS|SS_BLACKRECT,
-                        d3dRect.left,d3dRect.top,d3dRect.right-d3dRect.left,
-                        d3dRect.bottom-d3dRect.top,hwnd_,nullptr,instance_,nullptr);
-                    if(d3dView)SetWindowPos(d3dView,HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW);
-                    if(d3dView&&d3d.initialize(d3dView,d3dError)){
+                    // Vulkan has been shut down; DXGI now owns the same HWND.
+                    // Do not create a second child window for calibration.
+                    RedrawWindow(view_,nullptr,nullptr,RDW_INVALIDATE|RDW_ERASE|RDW_UPDATENOW);
+                    DwmFlush();
+                    if(d3d.initialize(view_,d3dError)){
                         {
                             std::wstring sceneTitle=L"Vulkan Image Mask Studio v0.4.12.13";
                             SetWindowTextW(hwnd_,sceneTitle.c_str());
@@ -756,13 +752,12 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                         report<<L"  Direct3D 11 device: PASS [native hardware renderer]\r\n";
                         report<<L"  Direct3D 11 GPU: "<<d3d.gpuName()<<L"\r\n";
                         report<<L"  Direct3D 11 presented rate: "<<std::fixed<<std::setprecision(1)<<(d3dFrames/d3dSeconds)<<L" frames/s (VSync/presentation)\r\n";
-                        if(d3dFrames==0){report<<L"  Direct3D 11 presentation: FAILED (zero successful frames)\\r\\n";ok=false;}
+                        if(d3dFrames==0){report<<L"  Direct3D 11 presentation: FAILED (zero successful frames)\r\n";ok=false;}
                         else report<<L"  Direct3D 11 presentation: "<<d3dFrames<<L" successful Present calls (visual output not independently verified)\\r\\n";
                         d3d.shutdown();
                     }else{
                         report<<L"  Direct3D 11 device/render: UNAVAILABLE - "<<d3dError<<L"\r\n";
                     }
-                    if(d3dView)DestroyWindow(d3dView);
                     // Restore Vulkan after D3D11 has released its DXGI swap chain.
                     try{
                         renderer_.initialize(view_);
