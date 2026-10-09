@@ -826,8 +826,15 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
         else if (id == IDC_UPDATES && code == BN_CLICKED){
             // Dedicated application update entry point; model/shader downloader
             // is intentionally not invoked here.
-            ShellExecuteW(hwnd_,L"open",L"https://github.com/khant735/VIMS/actions/workflows/windows-release.yml",nullptr,nullptr,SW_SHOWNORMAL);
-            setStatus(L"Updates: opened the latest Windows builds in your browser. Automatic installation is not enabled yet.");
+            const auto script=exeDir()/L"Update_VIMS.ps1";
+            if(!std::filesystem::exists(script)){
+                showError(L"Updates!",L"Update_VIMS.ps1 is missing beside VulkanImageMaskStudio.exe.");
+            }else{
+                const std::wstring args=L"-NoProfile -ExecutionPolicy Bypass -File \\""+script.wstring()+L"\\" -WaitPid "+std::to_wstring(GetCurrentProcessId());
+                auto result=reinterpret_cast<INT_PTR>(ShellExecuteW(hwnd_,L"open",L"powershell.exe",args.c_str(),exeDir().c_str(),SW_SHOWNORMAL));
+                if(result<=32)showError(L"Updates!",L"Could not start the standalone update verifier.");
+                else setStatus(L"Updates!: checking public GitHub release; close VIMS when prompted to install verified files.");
+            }
         }
         else if (id == IDC_DIAGNOSTICS && code == BN_CLICKED) runtimeDiagnostics(true);
         else if (id == IDC_EXPORT && code == BN_CLICKED) exportSelected();
