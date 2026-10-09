@@ -122,11 +122,13 @@ jobs:
           $out = 'build/Release'
           # Stage everything before hashing; the report itself is excluded to
           # avoid a self-referential hash.
-          Copy-Item download_models.ps1,Download_VIMS_Shaders.ps1 $out -Force
+          Copy-Item download_models.ps1,Download_VIMS_Shaders.ps1,Update_VIMS.ps1 $out -Force
           Copy-Item models $out -Recurse -Force
           Copy-Item LICENSE,THIRD_PARTY.md $out -Force
           New-Item -ItemType Directory -Force -Path distribution-manifests | Out-Null
           $latest = 'distribution-manifests/latest.tsv'
+          if (Test-Path $latest) { Copy-Item $latest 'distribution-manifests/previous.tsv' -Force }
+          else { Set-Content 'distribution-manifests/previous.tsv' -Value @() -Encoding utf8 }
           $previous = @{}
           if (Test-Path $latest) {
             Get-Content $latest | ForEach-Object {
@@ -191,6 +193,47 @@ jobs:
           "$crc32  $zip" | Set-Content "$zip.crc32" -Encoding ascii
           "RELEASE_ZIP=$zip" >> $env:GITHUB_ENV
           "RELEASE_CRC32=$crc32" >> $env:GITHUB_ENV
+
+      - name: Publish public incremental update assets
+        if: github.ref_type != 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'build/Release'
+          $old = @{}
+          if (Test-Path 'distribution-manifests/previous.tsv') {
+            Get-Content 'distribution-manifests/previous.tsv' | ForEach-Object {
+              $v = $_ -split "`t",2
+              if ($v.Count -eq 2) { $old[$v[0]] = $v[1] }
+            }
+          }
+          $changed = @()
+          Get-Content 'distribution-manifests/latest.tsv' | ForEach-Object {
+            $v = $_ -split "`t",2
+            if ($v.Count -eq 2 -and (!$old.ContainsKey($v[0]) -or $old[$v[0]] -ne $v[1])) { $changed += $v[0] }
+          }
+          New-Item -ItemType Directory -Force -Path 'update-stage' | Out-Null
+          foreach ($file in $changed) {
+            $src = Join-Path $out $file
+            $dst = Join-Path 'update-stage' $file
+            New-Item -ItemType Directory -Force -Path (Split-Path $dst -Parent) | Out-Null
+            Copy-Item -LiteralPath $src -Destination $dst -Force
+          }
+          if ($changed.Count -eq 0) {
+            Set-Content 'update-stage/NO_CHANGES.txt' 'No changed files' -Encoding ascii
+          }
+          Compress-Archive -Path 'update-stage/*' -DestinationPath 'VIMS-Update-Files.zip' -Force
+          Compress-Archive -Path "$out/*" -DestinationPath 'VIMS-Full-Windows-x64.zip' -Force
+          Copy-Item 'distribution-manifests/latest.tsv' 'distribution-manifest.tsv'
+          Copy-Item 'distribution-manifests/previous.tsv' 'distribution-previous.tsv'
+          gh release view development-latest --repo khant735/VIMS *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create development-latest --repo khant735/VIMS --title 'Development auto-update channel' --notes 'Latest successful Windows development build. Files are hash-verified by VIMS updater.' --prerelease
+          }
+          gh release upload development-latest 'VIMS-Update-Files.zip' 'VIMS-Full-Windows-x64.zip' 'distribution-manifest.tsv' 'distribution-previous.tsv' --clobber --repo khant735/VIMS
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish update assets' }
 
       - name: Publish distribution hash manifest
         if: github.ref_type != 'tag'
