@@ -235,6 +235,51 @@ jobs:
           gh release upload development-latest 'VIMS-Update-Files.zip' 'VIMS-Full-Windows-x64.zip' 'distribution-manifest.tsv' 'distribution-previous.tsv' --clobber --repo khant735/VIMS
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish update assets' }
 
+      - name: Verify updater syntax and published packages
+        if: github.ref_type != 'tag'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'Update_VIMS.ps1'),[ref]$tokens,[ref]$errors) | Out-Null
+          if ($errors.Count) { throw "Updater PowerShell syntax failed: $($errors -join '; ')" }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $latest = @{}
+          Get-Content 'distribution-manifest.tsv' | ForEach-Object {
+            $v = $_ -split "`t",2
+            if ($v.Count -eq 2) { $latest[$v[0].Replace([char]92,'/')] = $v[1].ToLowerInvariant() }
+          }
+          $previous = @{}
+          Get-Content 'distribution-previous.tsv' | ForEach-Object {
+            $v = $_ -split "`t",2
+            if ($v.Count -eq 2) { $previous[$v[0].Replace([char]92,'/')] = $v[1].ToLowerInvariant() }
+          }
+          foreach ($spec in @(@('VIMS-Full-Windows-x64.zip',$false),@('VIMS-Update-Files.zip',$true))) {
+            $zip = [IO.Compression.ZipFile]::OpenRead($spec[0])
+            try {
+              $seen = @{}
+              foreach ($entry in $zip.Entries) {
+                if ($entry.FullName.EndsWith('/')) { continue }
+                $name = $entry.FullName.Replace([char]92,'/')
+                if ($name -eq 'DISTRIBUTION_CHANGE_LIST.txt' -or $name -eq 'NO_CHANGES.txt') { continue }
+                if (!$latest.ContainsKey($name)) { throw "Unexpected archive entry: $name" }
+                $stream = $entry.Open()
+                try {
+                  $sha = [Security.Cryptography.SHA256]::Create()
+                  try { $hash = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','').ToLowerInvariant() }
+                  finally { $sha.Dispose() }
+                } finally { $stream.Dispose() }
+                if ($hash -ne $latest[$name]) { throw "Archive hash mismatch: $name" }
+                $seen[$name] = $true
+              }
+              $required = @($latest.Keys)
+              if ($spec[1]) { $required = @($latest.Keys | Where-Object { !$previous.ContainsKey($_) -or $previous[$_] -ne $latest[$_] }) }
+              foreach ($name in $required) { if (!$seen.ContainsKey($name)) { throw "Archive missing required file: $name" } }
+              Write-Host "PASS $($spec[0]): $($seen.Count) verified files"
+            } finally { $zip.Dispose() }
+          }
+
       - name: Publish distribution hash manifest
         if: github.ref_type != 'tag'
         shell: pwsh
