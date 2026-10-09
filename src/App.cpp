@@ -50,7 +50,7 @@ bool withinGuide(const RECT& r,double angle,double x,double y){
     return std::abs(p.x)<=(r.right-r.left)*.5&&std::abs(p.y)<=(r.bottom-r.top)*.5;
 }
 enum : int {
-    IDC_OPEN = 1001, IDC_ANALYSE, IDC_MASKLIST, IDC_BOUNDARY, IDC_TRANSPARENT_CUTOUT, IDC_EXPORT, IDC_EXPORT_ALL, IDC_CPUCOMBO, IDC_BACKENDCOMBO, IDC_REFINE_ENABLE, IDC_BOUNDARY_SLIDER, IDC_MATERIAL_SLIDER, IDC_COLOUR_SLIDER, IDC_RADIUS_SLIDER, IDC_FILL_HOLES, IDC_REMOVE_ISLANDS, IDC_PROTECT_SKIN, IDC_RAW_VIEW, IDC_REFINED_VIEW, IDC_RESET_REFINE, IDC_FACE_MODEL, IDC_DIAGNOSTICS, IDC_GUIDE, IDC_APPLY_GUIDE, IDC_RESET_GUIDE, IDC_CREATE_PART, IDC_APPROVE_MASK, IDC_POSE_GIF, IDC_ZOOM_IN, IDC_ZOOM_OUT, IDC_ZOOM_FIT, IDC_OPERATION_DETAIL, IDC_OPERATION_LOG, IDC_GPU_SELFTEST
+    IDC_OPEN = 1001, IDC_ANALYSE, IDC_MASKLIST, IDC_BOUNDARY, IDC_TRANSPARENT_CUTOUT, IDC_EXPORT, IDC_EXPORT_ALL, IDC_CPUCOMBO, IDC_BACKENDCOMBO, IDC_REFINE_ENABLE, IDC_BOUNDARY_SLIDER, IDC_MATERIAL_SLIDER, IDC_COLOUR_SLIDER, IDC_RADIUS_SLIDER, IDC_FILL_HOLES, IDC_REMOVE_ISLANDS, IDC_PROTECT_SKIN, IDC_RAW_VIEW, IDC_REFINED_VIEW, IDC_RESET_REFINE, IDC_FACE_MODEL, IDC_DIAGNOSTICS, IDC_GUIDE, IDC_APPLY_GUIDE, IDC_RESET_GUIDE, IDC_CREATE_PART, IDC_APPROVE_MASK, IDC_POSE_GIF, IDC_ZOOM_IN, IDC_ZOOM_OUT, IDC_ZOOM_FIT, IDC_OPERATION_DETAIL, IDC_OPERATION_LOG, IDC_GPU_SELFTEST, IDC_UPDATES
 };
 
 std::wstring utf8ToWide(const std::string& s) {
@@ -306,6 +306,8 @@ void App::createUi() {
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_GPU_SELFTEST), instance_, nullptr);
     diagnosticsBtn_ = CreateWindowW(L"BUTTON", L"Runtime diagnostics", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
         0,0,100,32, panelContent_, reinterpret_cast<HMENU>(IDC_DIAGNOSTICS), instance_, nullptr);
+    CreateWindowW(L"BUTTON",L"Updates!",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+        0,0,90,30,hwnd_,reinterpret_cast<HMENU>(IDC_UPDATES),instance_,nullptr);
 
     maskLabel_ = CreateWindowW(L"STATIC", L"Detected subjects and parts", WS_CHILD | WS_VISIBLE,
         0,0,100,20, panelContent_, nullptr, instance_, nullptr);
@@ -397,6 +399,7 @@ void App::layout() {
     fitToolbarButton(gpuSelfTestBtn_);
     fitToolbarButton(diagnosticsBtn_);
     fitToolbarButton(poseGifBtn_);
+    MoveWindow(GetDlgItem(hwnd_,IDC_UPDATES),topX,S(7),S(90),topButtonH,TRUE);
 
     RECT existingPanel{};GetWindowRect(rightPanel_,&existingPanel);
     if(existingPanel.right-existingPanel.left!=cw-vw||existingPanel.bottom-existingPanel.top!=ch)
@@ -819,6 +822,12 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
                 SendMessageW(edit,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);
                 SetFocus(edit);
             }else MessageBoxW(hwnd_,reportText.c_str(),L"Render Test / Calibration",MB_OK|MB_ICONINFORMATION);
+        }
+        else if (id == IDC_UPDATES && code == BN_CLICKED){
+            // Dedicated application update entry point; model/shader downloader
+            // is intentionally not invoked here.
+            ShellExecuteW(hwnd_,L"open",L"https://github.com/khant735/VIMS/actions/workflows/windows-release.yml",nullptr,nullptr,SW_SHOWNORMAL);
+            setStatus(L"Updates: opened the latest Windows builds in your browser. Automatic installation is not enabled yet.");
         }
         else if (id == IDC_DIAGNOSTICS && code == BN_CLICKED) runtimeDiagnostics(true);
         else if (id == IDC_EXPORT && code == BN_CLICKED) exportSelected();
