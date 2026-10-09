@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <fstream>
+#include <cctype>
 
 static void vkCheck(VkResult r, const char* what) {
     if (r != VK_SUCCESS) throw std::runtime_error(what);
@@ -489,14 +490,14 @@ void VulkanRenderer::createGearFramebuffers(){
     VkImageView at[]={gearOffscreenColorView_,gearDepthView_};VkFramebufferCreateInfo fi{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};fi.renderPass=gearRenderPass_;fi.attachmentCount=2;fi.pAttachments=at;fi.width=w;fi.height=h;fi.layers=1;vkCheck(vkCreateFramebuffer(device_,&fi,nullptr,&gearOffscreenFramebuffer_),"Could not create gear offscreen framebuffer.");
 }
 void VulkanRenderer::destroyGearResources(){
-    if(!device_)return;destroyGearFramebuffers();if(gearPipeline_)vkDestroyPipeline(device_,gearPipeline_,nullptr);
+    if(!device_)return;destroyGearFramebuffers();if(gearPipeline_)vkDestroyPipeline(device_,gearPipeline_,nullptr);if(hudPipeline_)vkDestroyPipeline(device_,hudPipeline_,nullptr);if(hudPipelineLayout_)vkDestroyPipelineLayout(device_,hudPipelineLayout_,nullptr);
     if(gearTextureSampler_)vkDestroySampler(device_,gearTextureSampler_,nullptr);
     for(int mi=0;mi<3;++mi){if(gearTextureViews_[mi])vkDestroyImageView(device_,gearTextureViews_[mi],nullptr);if(gearTextures_[mi])vkDestroyImage(device_,gearTextures_[mi],nullptr);if(gearTextureMemories_[mi])vkFreeMemory(device_,gearTextureMemories_[mi],nullptr);}
     if(gearDescriptorPool_)vkDestroyDescriptorPool(device_,gearDescriptorPool_,nullptr);
     if(gearPipelineLayout_)vkDestroyPipelineLayout(device_,gearPipelineLayout_,nullptr);
     if(gearDescriptorSetLayout_)vkDestroyDescriptorSetLayout(device_,gearDescriptorSetLayout_,nullptr);
     if(gearRenderPass_)vkDestroyRenderPass(device_,gearRenderPass_,nullptr);if(gearVertexBuffer_)vkDestroyBuffer(device_,gearVertexBuffer_,nullptr);if(gearVertexMemory_)vkFreeMemory(device_,gearVertexMemory_,nullptr);if(gearIndexBuffer_)vkDestroyBuffer(device_,gearIndexBuffer_,nullptr);if(gearIndexMemory_)vkFreeMemory(device_,gearIndexMemory_,nullptr);
-    gearPipeline_=VK_NULL_HANDLE;gearPipelineLayout_=VK_NULL_HANDLE;gearRenderPass_=VK_NULL_HANDLE;
+    gearPipeline_=VK_NULL_HANDLE;gearPipelineLayout_=VK_NULL_HANDLE;hudPipeline_=VK_NULL_HANDLE;hudPipelineLayout_=VK_NULL_HANDLE;gearRenderPass_=VK_NULL_HANDLE;
     gearDescriptorSetLayout_=VK_NULL_HANDLE;gearDescriptorPool_=VK_NULL_HANDLE;
     for(int mi=0;mi<3;++mi){gearDescriptorSets_[mi]=VK_NULL_HANDLE;gearTextures_[mi]=VK_NULL_HANDLE;gearTextureMemories_[mi]=VK_NULL_HANDLE;gearTextureViews_[mi]=VK_NULL_HANDLE;}gearTextureSampler_=VK_NULL_HANDLE;gearVertexBuffer_=gearIndexBuffer_=VK_NULL_HANDLE;gearVertexMemory_=gearIndexMemory_=VK_NULL_HANDLE;gearIndexCount_=0;
 }
@@ -554,6 +555,22 @@ void VulkanRenderer::createGearResources(){
     struct PC{Mat4 mvp,model;float color[4];};VkPushConstantRange pr{VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(PC)};VkPipelineLayoutCreateInfo li{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};li.setLayoutCount=1;li.pSetLayouts=&gearDescriptorSetLayout_;li.pushConstantRangeCount=1;li.pPushConstantRanges=&pr;vkCheck(vkCreatePipelineLayout(device_,&li,nullptr,&gearPipelineLayout_),"Could not create gear pipeline layout.");
     auto sm=[&](const std::vector<uint32_t>&d){VkShaderModule s{};VkShaderModuleCreateInfo si{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};si.codeSize=d.size()*4;si.pCode=d.data();vkCheck(vkCreateShaderModule(device_,&si,nullptr,&s),"Could not create gear shader.");return s;};VkShaderModule vsm=sm(vs),fsm=sm(fs);VkPipelineShaderStageCreateInfo ss[2]={{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,nullptr,0,VK_SHADER_STAGE_VERTEX_BIT,vsm,"main",nullptr},{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,nullptr,0,VK_SHADER_STAGE_FRAGMENT_BIT,fsm,"main",nullptr}};
     VkVertexInputBindingDescription bd{0,sizeof(GearVertex),VK_VERTEX_INPUT_RATE_VERTEX};VkVertexInputAttributeDescription ad[3]={{0,0,VK_FORMAT_R32G32B32_SFLOAT,offsetof(GearVertex,p)},{1,0,VK_FORMAT_R32G32B32_SFLOAT,offsetof(GearVertex,n)},{2,0,VK_FORMAT_R32G32_SFLOAT,offsetof(GearVertex,uv)}};VkPipelineVertexInputStateCreateInfo vi{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};vi.vertexBindingDescriptionCount=1;vi.pVertexBindingDescriptions=&bd;vi.vertexAttributeDescriptionCount=3;vi.pVertexAttributeDescriptions=ad;VkPipelineInputAssemblyStateCreateInfo ia{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};ia.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;VkPipelineViewportStateCreateInfo vp{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};vp.viewportCount=1;vp.scissorCount=1;VkPipelineRasterizationStateCreateInfo rs{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};rs.polygonMode=VK_POLYGON_MODE_FILL;rs.cullMode=VK_CULL_MODE_NONE;rs.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;rs.lineWidth=1;VkPipelineMultisampleStateCreateInfo ms{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};ms.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;VkPipelineDepthStencilStateCreateInfo ds{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};ds.depthTestEnable=ds.depthWriteEnable=VK_TRUE;ds.depthCompareOp=VK_COMPARE_OP_LESS;VkPipelineColorBlendAttachmentState ba{};ba.colorWriteMask=15;VkPipelineColorBlendStateCreateInfo bs{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};bs.attachmentCount=1;bs.pAttachments=&ba;VkDynamicState dyns[]={VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};VkPipelineDynamicStateCreateInfo dy{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};dy.dynamicStateCount=2;dy.pDynamicStates=dyns;VkGraphicsPipelineCreateInfo gi{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};gi.stageCount=2;gi.pStages=ss;gi.pVertexInputState=&vi;gi.pInputAssemblyState=&ia;gi.pViewportState=&vp;gi.pRasterizationState=&rs;gi.pMultisampleState=&ms;gi.pDepthStencilState=&ds;gi.pColorBlendState=&bs;gi.pDynamicState=&dy;gi.layout=gearPipelineLayout_;gi.renderPass=gearRenderPass_;vkCheck(vkCreateGraphicsPipelines(device_,VK_NULL_HANDLE,1,&gi,nullptr,&gearPipeline_),"Could not create 3D gear pipeline.");vkDestroyShaderModule(device_,vsm,nullptr);vkDestroyShaderModule(device_,fsm,nullptr);
+    // Dedicated depth-free framebuffer HUD, sharing the gear render pass.
+    auto hv=readSpv(L"hud.vert.spv"),hf=readSpv(L"hud.frag.spv");
+    if(!hv.empty()&&!hf.empty()){
+        VkPipelineLayoutCreateInfo hli{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+        vkCheck(vkCreatePipelineLayout(device_,&hli,nullptr,&hudPipelineLayout_),"HUD pipeline layout failed.");
+        VkShaderModule hvs=sm(hv),hfs=sm(hf);
+        VkPipelineShaderStageCreateInfo hs[2]={{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,nullptr,0,VK_SHADER_STAGE_VERTEX_BIT,hvs,"main",nullptr},{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,nullptr,0,VK_SHADER_STAGE_FRAGMENT_BIT,hfs,"main",nullptr}};
+        VkVertexInputBindingDescription hbd{0,sizeof(float)*2,VK_VERTEX_INPUT_RATE_VERTEX};
+        VkVertexInputAttributeDescription had{0,0,VK_FORMAT_R32G32_SFLOAT,0};
+        VkPipelineVertexInputStateCreateInfo hvi{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+        hvi.vertexBindingDescriptionCount=1;hvi.pVertexBindingDescriptions=&hbd;hvi.vertexAttributeDescriptionCount=1;hvi.pVertexAttributeDescriptions=&had;
+        VkPipelineDepthStencilStateCreateInfo hds=ds;hds.depthTestEnable=VK_FALSE;hds.depthWriteEnable=VK_FALSE;
+        VkGraphicsPipelineCreateInfo hgi=gi;hgi.pStages=hs;hgi.pVertexInputState=&hvi;hgi.pDepthStencilState=&hds;hgi.layout=hudPipelineLayout_;
+        vkCheck(vkCreateGraphicsPipelines(device_,VK_NULL_HANDLE,1,&hgi,nullptr,&hudPipeline_),"HUD pipeline creation failed.");
+        vkDestroyShaderModule(device_,hvs,nullptr);vkDestroyShaderModule(device_,hfs,nullptr);
+    }
 }
 bool VulkanRenderer::drawGearCalibration(float seconds,uint32_t targetWidth,uint32_t targetHeight){
     if(!device_||!gearPipeline_||!swapchain_)return false;
@@ -569,7 +586,30 @@ bool VulkanRenderer::drawGearCalibration(float seconds,uint32_t targetWidth,uint
     auto part=[&](float x,float spin,float material,uint32_t count,uint32_t first){int mi=std::clamp((int)(material+0.5f),0,2);vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,gearPipelineLayout_,0,1,&gearDescriptorSets_[mi],0,nullptr);Mat4 model=mul(translate(x,0,0),rotZ(spin));PC pc{mul(vp,model),model,{0,0,0,material}};vkCmdPushConstants(cmd,gearPipelineLayout_,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(pc),&pc);vkCmdDrawIndexed(cmd,count,1,first,0,0);};
     constexpr float leftX=-.54f,rightX=1.08f,smallHalfTooth=3.14159265359f/8.0f;const float spin=seconds*1.35f,smallSpin=-2.0f*spin+smallHalfTooth;
     part(leftX,spin,0.0f,gearLargeIndexCount_,0);part(leftX,spin,2.0f,gearLargeSpindleIndexCount_,gearLargeSpindleFirstIndex_);part(rightX,smallSpin,1.0f,gearSmallIndexCount_,gearSmallFirstIndex_);part(rightX,smallSpin,2.0f,gearSmallSpindleIndexCount_,gearSmallSpindleFirstIndex_);
-    vkCmdEndRenderPass(cmd);
+    // Generate a compact 3x5 raster font as native Vulkan triangles.
+    if(hudPipeline_&&!calibrationBackend_.empty()){
+        static const char* glyph[]={"111101101101111","010110010010111","111001111100111","111001111001111","101101111001001","111100111001111","111100111101111","111001001001001","111101111101111","111101111001111","010101111101101","110101110101110","111100100100111","110101101101110","111100110100111","111100110100100","111100101101111","101101111101101","111010010010111","001001001101111","101101110101101","100100100100111","101111111101101","101111111111101","111101101101111","111101111100100","111101101111001","111101111110101","111100111001111","111010010010010","101101101101111","101101101101010","101101111111101","101101010101101","101101010010010","111001010100111"};
+        std::string label=calibrationBackend_+"  "+calibrationGpu_;
+        std::transform(label.begin(),label.end(),label.begin(),[](unsigned char ch){return (char)std::toupper(ch);});
+        std::vector<float> triangles;float unit=std::min(.010f,1.82f/std::max<size_t>(1,label.size()*4));float x=-.94f,y=.91f;
+        auto square=[&](float xx,float yy){float w=unit*.85f,h=unit*.85f;float q[]={xx,yy,xx+w,yy,xx+w,yy-h,xx,yy,xx+w,yy-h,xx,yy-h};triangles.insert(triangles.end(),q,q+12);};
+        for(char ch:label){if(ch==' '){x+=unit*2.5f;continue;}int idx=-1;if(ch>='0'&&ch<='9')idx=ch-'0';else if(ch>='A'&&ch<='Z')idx=ch-'A'+10;
+            if(idx>=0)for(int r=0;r<5;++r)for(int col=0;col<3;++col)if(glyph[idx][r*3+col]=='1')square(x+col*unit,y-r*unit);x+=unit*3.8f;}
+        if(!triangles.empty()){
+            VkBuffer vb{};VkDeviceMemory vm{};VkBufferCreateInfo bi{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};bi.size=triangles.size()*sizeof(float);bi.usage=VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;bi.sharingMode=VK_SHARING_MODE_EXCLUSIVE;
+            vkCheck(vkCreateBuffer(device_,&bi,nullptr,&vb),"HUD buffer creation failed.");VkMemoryRequirements mr{};vkGetBufferMemoryRequirements(device_,vb,&mr);
+            VkMemoryAllocateInfo ai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};ai.allocationSize=mr.size;ai.memoryTypeIndex=findMemoryType(mr.memoryTypeBits,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+            vkCheck(vkAllocateMemory(device_,&ai,nullptr,&vm),"HUD memory allocation failed.");vkBindBufferMemory(device_,vb,vm,0);void* ptr=nullptr;vkMapMemory(device_,vm,0,bi.size,0,&ptr);std::memcpy(ptr,triangles.data(),bi.size);vkUnmapMemory(device_,vm);
+            vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,hudPipeline_);VkDeviceSize offset=0;vkCmdBindVertexBuffers(cmd,0,1,&vb,&offset);vkCmdDraw(cmd,(uint32_t)(triangles.size()/2),1,0,0);
+            // The recorded draw must complete before releasing its transient vertex buffer.
+            vkCmdEndRenderPass(cmd);
+            vkEndCommandBuffer(cmd);
+            VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};submit.commandBufferCount=1;submit.pCommandBuffers=&cmd;
+            vkCheck(vkQueueSubmit(queue_,1,&submit,VK_NULL_HANDLE),"HUD queue submit failed.");vkQueueWaitIdle(queue_);
+            vkDestroyBuffer(device_,vb,nullptr);vkFreeMemory(device_,vm,nullptr);
+            vkFreeCommandBuffers(device_,commandPool_,1,&cmd);cmd=beginOneTime();
+        }else vkCmdEndRenderPass(cmd);
+    }else vkCmdEndRenderPass(cmd);
     transition(cmd,swapImages_[imageIndex],VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,0,VK_ACCESS_TRANSFER_WRITE_BIT,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT);
     VkClearColorValue black{{.025f,.035f,.055f,1}};VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};vkCmdClearColorImage(cmd,swapImages_[imageIndex],VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,&black,1,&range);
     double sa=double(gearTargetExtent_.width)/gearTargetExtent_.height,da=double(extent_.width)/extent_.height;int x0=0,y0=0,x1=(int)extent_.width,y1=(int)extent_.height;if(da>sa){int w=(int)(extent_.height*sa);x0=((int)extent_.width-w)/2;x1=x0+w;}else{int h=(int)(extent_.width/sa);y0=((int)extent_.height-h)/2;y1=y0+h;}
