@@ -830,7 +830,7 @@ LRESULT App::handle(HWND h, UINT m, WPARAM w, LPARAM l) {
             if(!std::filesystem::exists(script)){
                 showError(L"Updates!",L"Update_VIMS.ps1 is missing beside VulkanImageMaskStudio.exe.");
             }else{
-                const std::wstring args=L"-NoProfile -ExecutionPolicy Bypass -File \\""+script.wstring()+L"\\" -WaitPid "+std::to_wstring(GetCurrentProcessId());
+                const std::wstring args=L"-NoProfile -ExecutionPolicy Bypass -File "+std::wstring(1,L'"')+script.wstring()+L"\" -WaitPid "+std::to_wstring(GetCurrentProcessId());
                 auto result=reinterpret_cast<INT_PTR>(ShellExecuteW(hwnd_,L"open",L"powershell.exe",args.c_str(),exeDir().c_str(),SW_SHOWNORMAL));
                 if(result<=32)showError(L"Updates!",L"Could not start the standalone update verifier.");
                 else setStatus(L"Updates!: checking public GitHub release; close VIMS when prompted to install verified files.");
